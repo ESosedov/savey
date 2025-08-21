@@ -1,18 +1,21 @@
-FROM node:22.12.0-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Копирование package.json и package-lock.json
 COPY package*.json ./
 
-# Установка зависимостей
-RUN npm ci --only=production
+# Установка всех зависимостей (включая devDependencies для сборки)
+RUN npm ci
 
 # Копирование исходного кода
 COPY . .
 
 # Сборка приложения
 RUN npm run build
+
+# Удаление devDependencies после сборки (опционально)
+RUN npm prune --production
 
 # Открытие порта
 EXPOSE 3000
