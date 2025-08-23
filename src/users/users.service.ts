@@ -4,28 +4,44 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Folder } from '../folders/entities/folder.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Folder)
+    private readonly folderRepository: Repository<Folder>,
   ) {}
 
-  // Создание пользователя
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const user = this.userRepository.create(createUserDto);
-    return await this.userRepository.save(user);
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(createUserDto.password, saltRounds);
+    const user = this.userRepository.create({
+      ...createUserDto,
+      passwordHash,
+    });
+    const savedUser = await this.userRepository.save(user);
+
+    const favoriteFolder = this.folderRepository.create({
+      title: 'Favorite',
+      isPublic: false,
+      userId: savedUser.id,
+      user: user,
+    });
+    await this.folderRepository.save(favoriteFolder);
+
+    return savedUser;
   }
 
-  // Получение всех пользователей
   async findAll(): Promise<User[]> {
     return await this.userRepository.find({
       order: { createdAt: 'DESC' },
     });
   }
 
-  // Получение пользователя по ID
   async findOne(id: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id } });
 
@@ -36,7 +52,6 @@ export class UsersService {
     return user;
   }
 
-  // Обновление пользователя
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
@@ -45,13 +60,11 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
-  // Удаление пользователя
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.userRepository.remove(user);
   }
 
-  // Поиск по email
   async findByEmail(email: string): Promise<User | null> {
     return await this.userRepository.findOne({ where: { email } });
   }

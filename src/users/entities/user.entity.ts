@@ -5,7 +5,9 @@ import {
   UpdateDateColumn,
   Generated,
   PrimaryColumn,
+  OneToMany,
 } from 'typeorm';
+import { Folder } from '../../folders/entities/folder.entity';
 
 @Entity('users')
 export class User {
@@ -24,6 +26,12 @@ export class User {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column()
+  passwordHash: string;
+
+  @OneToMany(() => Folder, (folder) => folder.user)
+  folders: Folder[];
 
   @CreateDateColumn()
   createdAt: Date;
