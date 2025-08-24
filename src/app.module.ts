@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { FoldersModule } from './folders/folders.module';
 import { ContentModule } from './content/content.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -26,9 +27,10 @@ import { ContentModule } from './content/content.module';
       }),
       inject: [ConfigService],
     }),
-    UsersModule,
+    AuthModule,
     ContentModule,
     FoldersModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
