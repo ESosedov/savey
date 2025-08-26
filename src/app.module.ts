@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { FoldersModule } from './folders/folders.module';
 import { ContentModule } from './content/content.module';
 import { AuthModule } from './auth/auth.module';
+import { OpenGraphModule } from './opengraph/opengraph.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
     ContentModule,
     FoldersModule,
+    OpenGraphModule,
     UsersModule,
   ],
   controllers: [AppController],
