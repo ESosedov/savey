@@ -8,6 +8,7 @@ import { FoldersModule } from './folders/folders.module';
 import { ContentModule } from './content/content.module';
 import { AuthModule } from './auth/auth.module';
 import { OpenGraphModule } from './opengraph/opengraph.module';
+import { LinkPreviewModule } from './link-preview/link-preview.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { OpenGraphModule } from './opengraph/opengraph.module';
     FoldersModule,
     OpenGraphModule,
     UsersModule,
+    LinkPreviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],
