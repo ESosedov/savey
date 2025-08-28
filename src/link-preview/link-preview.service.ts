@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  LinkPreviewOptions,
-} from './interfaces/link-preview.interface';
+import { LinkPreviewOptions } from './interfaces/link-preview.interface';
 import { getLinkPreview } from 'link-preview-js';
 
 @Injectable()
@@ -16,16 +14,13 @@ export class LinkPreviewService {
         timeout: options?.timeout || 10000,
         headers: {
           'user-agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Linux; Android 15; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Mobile Safari/537.36',
+          accept: 'text/html,application/xhtml+xml',
+          'accept-Language': 'en;q=0.8,ru;q=0.7',
           ...options?.headers,
         },
+        followRedirects: 'follow',
       };
-
-      // Настройка обработки редиректов
-      if (options?.followRedirects !== false) {
-        requestOptions.followRedirects = 'manual';
-        requestOptions.handleRedirects = this.createRedirectHandler();
-      }
 
       return await getLinkPreview(url, requestOptions);
     } catch (error) {
