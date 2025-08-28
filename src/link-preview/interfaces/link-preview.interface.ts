@@ -1,6 +1,7 @@
 export interface LinkPreviewOptions {
   timeout?: number;
   headers?: Record<string, string>;
+  followRedirects?: boolean;
 }
 
 export interface LinkPreviewResult {
