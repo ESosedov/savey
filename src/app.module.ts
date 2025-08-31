@@ -9,6 +9,7 @@ import { ContentModule } from './content/content.module';
 import { AuthModule } from './auth/auth.module';
 import { OpenGraphModule } from './opengraph/opengraph.module';
 import { LinkPreviewModule } from './link-preview/link-preview.module';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { LinkPreviewModule } from './link-preview/link-preview.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: true,
         logging: true,
+        namingStrategy: new SnakeNamingStrategy(),
       }),
       inject: [ConfigService],
     }),

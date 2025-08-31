@@ -1,18 +1,13 @@
+import { ImageData } from '../../content/interfaces/image-data.interface';
+
 export class OpenGraphDto {
-  ogTitle?: string;
-  ogDescription?: string;
-  ogImage?: Array<{
-    url: string;
-    width?: string;
-    height?: string;
-    type?: string;
-  }>;
-  ogUrl?: string;
-  ogType?: string;
-  ogSiteName?: string;
-  charset?: string;
+  title?: string;
+  description?: string;
+  image?: ImageData;
+  url?: string;
+  type?: string;
+  siteName?: string;
   favicon?: string;
-  success: boolean;
 }
 
 export class GetPreviewDto {

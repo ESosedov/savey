@@ -8,6 +8,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Folder } from '../../folders/entities/folder.entity';
+import { Content } from '../../content/entities/content.entity';
 
 @Entity('users')
 export class User {
@@ -15,23 +16,26 @@ export class User {
   @Generated('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column('varchar', { unique: true })
   email: string;
 
-  @Column()
+  @Column('varchar')
   firstName: string;
 
-  @Column()
+  @Column('varchar')
   lastName: string;
 
-  @Column({ default: true })
+  @Column('boolean', { default: true })
   isActive: boolean;
 
-  @Column()
+  @Column('varchar')
   passwordHash: string;
 
   @OneToMany(() => Folder, (folder) => folder.user)
   folders: Folder[];
+
+  @OneToMany(() => Content, (content) => content.user)
+  content: Content[];
 
   @CreateDateColumn()
   createdAt: Date;

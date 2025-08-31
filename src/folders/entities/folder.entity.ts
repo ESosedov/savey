@@ -7,25 +7,27 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryColumn,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Content } from '../../content/entities/content.entity';
 
 @Entity('folders')
+@Unique('UQ_folder_title_user', ['title', 'userId'])
 export class Folder {
   @PrimaryColumn('uuid')
   @Generated('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column('varchar')
   title: string;
 
-  @Column()
+  @Column('boolean', { default: false })
   isPublic: boolean;
 
   @ManyToOne(() => User, (user) => user.folders)
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn()
   user: User;
 
   @Column('uuid')

@@ -23,7 +23,7 @@ import { GetUser } from '../auth/decorators/user.decorator';
 import { User } from '../users/entities/user.entity';
 import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
-import { UpdateContentDto } from './dto/update-content.dto';
+// import { UpdateContentDto } from './dto/update-content.dto';
 
 @ApiTags('content')
 @ApiBearerAuth()
@@ -67,21 +67,21 @@ export class ContentController {
     return this.contentService.findOne(id, user.id);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update content by ID' })
-  @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
-  @ApiBody({ type: UpdateContentDto })
-  @ApiResponse({ status: 200, description: 'Content successfully updated.' })
-  @ApiResponse({ status: 404, description: 'Content not found.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Access denied.' })
-  async update(
-    @GetUser() user: User,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body(ValidationPipe) updateContentDto: UpdateContentDto,
-  ) {
-    return this.contentService.update(id, updateContentDto, user.id);
-  }
+  // @Patch(':id')
+  // @ApiOperation({ summary: 'Update content by ID' })
+  // @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
+  // @ApiBody({ type: UpdateContentDto })
+  // @ApiResponse({ status: 200, description: 'Content successfully updated.' })
+  // @ApiResponse({ status: 404, description: 'Content not found.' })
+  // @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  // @ApiResponse({ status: 403, description: 'Access denied.' })
+  // async update(
+  //   @GetUser() user: User,
+  //   @Param('id', ParseUUIDPipe) id: string,
+  //   @Body(ValidationPipe) updateContentDto: UpdateContentDto,
+  // ) {
+  //   return this.contentService.update(id, updateContentDto, user.id);
+  // }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete content by ID' })

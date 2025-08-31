@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UpdateContentDto } from './dto/update-content.dto';
+// import { UpdateContentDto } from './dto/update-content.dto';
 import { Content } from './entities/content.entity';
 import { CreateContentDto } from './dto/create-content.dto';
 
@@ -27,24 +27,24 @@ export class ContentService {
     return await this.contentRepository.save(content);
   }
 
-  async update(
-    id: string,
-    updateContentDto: UpdateContentDto,
-    userId: string,
-  ): Promise<Content> {
-    const content = await this.contentRepository.findOne({ where: { id } });
-
-    if (!content) {
-      throw new NotFoundException(`Content with ID ${id} not found`);
-    }
-
-    if (content.userId !== userId) {
-      throw new ForbiddenException('You can only edit your own content');
-    }
-
-    Object.assign(content, updateContentDto);
-    return await this.contentRepository.save(content);
-  }
+  // async update(
+  //   id: string,
+  //   updateContentDto: UpdateContentDto,
+  //   userId: string,
+  // ): Promise<Content> {
+  //   const content = await this.contentRepository.findOne({ where: { id } });
+  //
+  //   if (!content) {
+  //     throw new NotFoundException(`Content with ID ${id} not found`);
+  //   }
+  //
+  //   if (content.userId !== userId) {
+  //     throw new ForbiddenException('You can only edit your own content');
+  //   }
+  //
+  //   Object.assign(content, updateContentDto);
+  //   return await this.contentRepository.save(content);
+  // }
 
   async findOne(id: string, userId: string): Promise<Content> {
     const content = await this.contentRepository.findOne({

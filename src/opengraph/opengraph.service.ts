@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import ogs from 'open-graph-scraper';
 import { OpenGraphDto } from './dto/opengraph.dto';
 import { OpenGraphOptions } from './interfaces/opengraph-options.interface';
+import probe from 'probe-image-size';
 
 @Injectable()
 export class OpenGraphService {
@@ -99,24 +100,20 @@ export class OpenGraphService {
       const data = await response.json();
 
       return {
-        ogTitle: data.title,
-        ogDescription: `${data.author_name} - YouTube`,
-        ogImage: data.thumbnail_url
-          ? [
-              {
-                url: data.thumbnail_url,
-                width: data.thumbnail_width?.toString(),
-                height: data.thumbnail_height?.toString(),
-                type: 'jpg',
-              },
-            ]
+        title: data.title,
+        description: `${data.author_name} - YouTube`,
+        image: data.thumbnail_url
+          ? {
+              url: data.thumbnail_url,
+              width: data.thumbnail_width,
+              height: data.thumbnail_height,
+              type: 'jpg',
+            }
           : undefined,
-        ogUrl: url,
-        ogType: 'video.other',
-        ogSiteName: 'YouTube',
-        charset: 'UTF-8',
+        url: url,
+        type: 'video.other',
+        siteName: 'YouTube',
         favicon: 'https://www.youtube.com/favicon.ico',
-        success: true,
       };
     } catch (error) {
       this.logger.error(`YouTube oEmbed API failed: ${error.message}`);
@@ -177,7 +174,9 @@ export class OpenGraphService {
           throw new Error(`OGS error: ${error}`);
         }
 
-        return this.mapToDto(result);
+        const imageData = await this.getImageData(result.ogImage);
+
+        return this.mapToDto(result, imageData);
       } catch (error) {
         lastError = error;
         this.logger.warn(
@@ -209,17 +208,34 @@ export class OpenGraphService {
     }
   }
 
-  private mapToDto(result: any): OpenGraphDto {
+  async getImageData(image: any): Promise<any> {
+    try {
+      const result = await probe(image[0].url);
+      return {
+        width: Number(result.width),
+        height: Number(result.height),
+        url: result.url,
+        type: result.type,
+      };
+    } catch (error) {
+      console.error('Ошибка:', error.message);
+      return null;
+    }
+  }
+
+  private mapToDto(result: any, imageData?: any): OpenGraphDto {
+    let image = result.ogImage;
+    if (imageData) {
+      image = imageData;
+    }
     return {
-      ogTitle: result.ogTitle,
-      ogDescription: result.ogDescription,
-      ogImage: result.ogImage,
-      ogUrl: result.ogUrl,
-      ogType: result.ogType,
-      ogSiteName: result.ogSiteName,
-      charset: result.charset,
+      title: result.ogTitle,
+      description: result.ogDescription,
+      image: image,
+      url: result.ogUrl,
+      type: result.ogType,
+      siteName: result.ogSiteName,
       favicon: result.favicon,
-      success: result.success || false,
     };
   }
 }
