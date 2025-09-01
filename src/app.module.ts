@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { OpenGraphModule } from './opengraph/opengraph.module';
 import { LinkPreviewModule } from './link-preview/link-preview.module';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+import { PreviewLinkModule } from './preview-link/preview-link.module';
 
 @Module({
   imports: [
@@ -34,9 +35,10 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
     AuthModule,
     ContentModule,
     FoldersModule,
-    OpenGraphModule,
-    UsersModule,
     LinkPreviewModule,
+    OpenGraphModule,
+    PreviewLinkModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
