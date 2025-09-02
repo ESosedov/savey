@@ -23,6 +23,8 @@ import { GetUser } from '../auth/decorators/user.decorator';
 import { User } from '../users/entities/user.entity';
 import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
+import { ContentFilterDto } from './dto/content-filter.dto';
+import { ContentDto } from './dto/content.dto';
 // import { UpdateContentDto } from './dto/update-content.dto';
 
 @ApiTags('content')
@@ -42,7 +44,7 @@ export class ContentController {
     @GetUser() user: User,
     @Body(ValidationPipe)
     createContentDto: CreateContentDto,
-  ) {
+  ): Promise<ContentDto> {
     // TODO: Add validation for folder ownership
     return this.contentService.create(createContentDto, user.id);
   }
@@ -56,6 +58,18 @@ export class ContentController {
     return this.contentService.search(query, user.id);
   }
 
+  @Post('list')
+  @ApiBody({ type: ContentFilterDto })
+  async getContent(
+    @GetUser() user: User,
+    @Body(ValidationPipe) filters: ContentFilterDto,
+  ): Promise<{
+    data: ContentDto[];
+    pagination: { nextCursor: string | null; hasMore: boolean };
+  }> {
+    return await this.contentService.getContentWithPagination(user.id, filters);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get content by ID' })
   @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
@@ -63,7 +77,10 @@ export class ContentController {
   @ApiResponse({ status: 404, description: 'Content not found.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Access denied.' })
-  async findOne(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+  async findOne(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ContentDto> {
     return this.contentService.findOne(id, user.id);
   }
 
