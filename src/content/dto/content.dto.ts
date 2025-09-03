@@ -1,6 +1,7 @@
 import { ImageData } from '../interfaces/image-data.interface';
 import { Exclude, Expose } from 'class-transformer';
 import { User } from '../../users/entities/user.entity';
+import { Folder } from '../../folders/entities/folder.entity';
 
 export class ContentDto {
   @Expose()
@@ -10,28 +11,37 @@ export class ContentDto {
   title?: string | null;
 
   @Expose()
-  description?: string | null;
-
-  @Expose()
-  image?: ImageData | null;
-
-  @Expose()
   url?: string | null;
 
   @Expose()
-  type?: string | null;
+  domain?: string | null;
 
-  @Expose()
-  siteName?: string | null;
-
-  @Expose()
-  favicon?: string | null;
+  @Exclude()
+  user: User;
 
   @Exclude()
   userId: string;
 
   @Exclude()
-  user: User;
+  folder: Folder;
+
+  @Exclude()
+  folderId: string;
+
+  @Expose()
+  favicon?: string | null;
+
+  @Expose()
+  siteName?: string | null;
+
+  @Expose()
+  image?: ImageData | null;
+
+  @Expose()
+  description?: string | null;
+
+  @Expose()
+  type?: string | null;
 
   @Exclude()
   createdAt: Date;
