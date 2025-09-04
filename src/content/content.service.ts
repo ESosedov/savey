@@ -53,9 +53,14 @@ export class ContentService {
       .limit(limit);
 
     if (search) {
-      queryBuilder = queryBuilder.andWhere('content.title ILIKE :search', {
-        search: `%${search}%`,
-      });
+      const searchTerm = search.toLowerCase();
+
+      queryBuilder = queryBuilder.andWhere(
+        'LOWER(content.title) LIKE :search',
+        {
+          search: `%${searchTerm}%`,
+        },
+      );
     }
 
     if (cursor) {
@@ -134,17 +139,5 @@ export class ContentService {
     }
 
     await this.contentRepository.remove(content);
-  }
-
-  async search(query: string, userId?: string): Promise<Content[]> {
-    const queryBuilder = this.contentRepository
-      .createQueryBuilder('content')
-      .leftJoinAndSelect('content.user', 'user')
-      .where('content.title ILIKE :query', { query: `%${query}%` })
-      .andWhere('(content.userId = :userId)', {
-        userId: userId,
-      });
-
-    return queryBuilder.orderBy('content.createdAt', 'DESC').getMany();
   }
 }

@@ -3,11 +3,9 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   ValidationPipe,
-  Query,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import {
@@ -16,7 +14,6 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
-  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { GetUser } from '../auth/decorators/user.decorator';
@@ -47,15 +44,6 @@ export class ContentController {
   ): Promise<ContentDto> {
     // TODO: Add validation for folder ownership
     return this.contentService.create(createContentDto, user.id);
-  }
-
-  @Get('search')
-  @ApiOperation({ summary: 'Search user content' })
-  @ApiQuery({ name: 'q', description: 'Search query', type: 'string' })
-  @ApiResponse({ status: 200, description: 'Search results retrieved.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  async search(@GetUser() user: User, @Query('q') query: string) {
-    return this.contentService.search(query, user.id);
   }
 
   @Post('list')

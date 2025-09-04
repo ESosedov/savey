@@ -8,9 +8,9 @@ export class AddContentIndexes1756838780633 implements MigrationInterface {
         `);
 
     await queryRunner.query(`
-            CREATE INDEX "idx_content_user_title_pagination" 
-            ON "content" ("user_id", "title", "created_at" DESC, "id" DESC)
-        `);
+      CREATE INDEX "idx_content_user_title_pagination"
+        ON "content" ("user_id", LOWER("title"), "created_at" DESC, "id" DESC)
+    `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
