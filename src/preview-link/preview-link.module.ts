@@ -4,13 +4,15 @@ import { PreviewLinkService } from './preview-link.service';
 import { LinkPreviewService } from './services/link-preview.service';
 import { OembedService } from './services/oembed.service';
 import { OpenGraphService } from './services/opengraph.service';
+import { ImageDataService } from './services/image-data.service';
 
 @Module({
   providers: [
-    PreviewLinkService,
+    ImageDataService,
     LinkPreviewService,
     OembedService,
     OpenGraphService,
+    PreviewLinkService,
   ],
   controllers: [PreviewLinkController],
   exports: [PreviewLinkService],

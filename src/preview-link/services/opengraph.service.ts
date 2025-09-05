@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import ogs from 'open-graph-scraper';
-import probe from 'probe-image-size';
 import { ContentDto } from '../dto/content.dto';
+import { ImageDataService } from './image-data.service';
 
 @Injectable()
 export class OpenGraphService {
   private readonly logger = new Logger(OpenGraphService.name);
+
+  constructor(private readonly imageDataService: ImageDataService) {}
 
   async getPreview(url: string): Promise<ContentDto | null> {
     const ogsOptions = {
@@ -42,28 +44,15 @@ export class OpenGraphService {
         return null;
       }
 
-      const imageData = await this.getImageData(result.ogImage);
+      const imageData = await this.imageDataService.getImageData(
+        result.ogImage,
+      );
 
       return this.mapToDto(result, imageData);
     } catch (error) {
       this.logger.error(
         `Failed to get link preview for ${url}: ${error.message}`,
       );
-      return null;
-    }
-  }
-
-  async getImageData(image: any): Promise<any> {
-    try {
-      const result = await probe(image[0].url);
-      return {
-        width: Number(result.width),
-        height: Number(result.height),
-        url: result.url,
-        type: result.type,
-      };
-    } catch (error) {
-      console.error('Error get image:', error.message);
       return null;
     }
   }
