@@ -43,8 +43,8 @@ export class ContentDto {
   @Expose()
   type?: string | null;
 
-  @Exclude()
-  createdAt: Date;
+  @Expose({ name: 'createdAt' })
+  savedAt: Date;
 
   @Exclude()
   updatedAt: Date;
