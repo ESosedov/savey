@@ -67,13 +67,13 @@ export class LinkPreviewService {
       image = imageData;
     }
     return {
-      title: result.ogTitle,
-      description: result.ogDescription,
+      title: result.title,
+      description: result.description,
       image: image,
-      url: result.ogUrl,
-      type: result.ogType,
-      siteName: result.ogSiteName,
-      favicon: result.favicon,
+      url: result.url,
+      type: result.mediaType,
+      siteName: result.siteName,
+      favicon: result.favicons[0] ?? null,
     };
   }
 
