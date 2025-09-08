@@ -25,11 +25,4 @@ export class ImageDto implements ImageData {
   @IsNumber()
   @IsOptional()
   width: number;
-
-  @ApiProperty({
-    description: 'Image file type',
-    example: 'jpg',
-  })
-  @IsString()
-  type: string;
 }

@@ -59,7 +59,6 @@ export class OembedService {
               url: data.thumbnail_url,
               width: data.thumbnail_width,
               height: data.thumbnail_height,
-              type: 'jpg',
             }
           : null,
         url: url,

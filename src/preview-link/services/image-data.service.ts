@@ -18,7 +18,6 @@ export class ImageDataService {
           width: Number(result.width),
           height: Number(result.height),
           url: result.url,
-          type: result.type,
         };
       } catch (error) {
         console.error('Error get image:', error.message);
