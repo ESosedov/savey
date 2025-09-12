@@ -107,7 +107,6 @@ export class OpenGraphService {
               url: data.thumbnail_url,
               width: data.thumbnail_width,
               height: data.thumbnail_height,
-              type: 'jpg',
             }
           : undefined,
         url: url,

@@ -66,7 +66,6 @@ export class CreateContentDto {
       height: '720',
       url: 'https://i.ytimg.com/vi/psAxqfx-plc/maxresdefault.jpg',
       width: '1280',
-      type: 'jpg',
     },
   })
   @IsOptional()
