@@ -1,7 +1,7 @@
-import { ImageData } from '../interfaces/image-data.interface';
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
 import { User } from '../../users/entities/user.entity';
 import { Folder } from '../../folders/entities/folder.entity';
+import { ImageDto } from './image.dto';
 
 export class ContentDto {
   @Expose()
@@ -25,7 +25,7 @@ export class ContentDto {
   @Exclude()
   folder: Folder;
 
-  @Exclude()
+  @Expose()
   folderId: string;
 
   @Expose()
@@ -35,7 +35,8 @@ export class ContentDto {
   siteName?: string | null;
 
   @Expose()
-  image?: ImageData | null;
+  @Type(() => ImageDto)
+  image?: ImageDto | null;
 
   @Expose()
   description?: string | null;

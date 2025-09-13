@@ -19,4 +19,12 @@ export class CreateFolderDto {
   @IsBoolean()
   @IsOptional()
   isPublic?: boolean = false;
+
+  @ApiProperty({
+    description: 'Folder description',
+    example: 'A folder for my important documents',
+  })
+  @IsString()
+  @IsOptional()
+  description: string;
 }

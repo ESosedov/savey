@@ -36,6 +36,9 @@ export class Folder {
   @OneToMany(() => Content, (content) => content.folder)
   content: Content[];
 
+  @Column('text', { nullable: true })
+  description: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

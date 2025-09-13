@@ -5,10 +5,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { ImageDto } from './image.dto';
+import { ImageCreateDto } from './image-create.dto';
 import { Type } from 'class-transformer';
 
-export class CreateContentDto {
+export class ContentCreateDto {
   @ApiProperty({
     description: 'Content title',
     example: 'My awesome article',
@@ -60,7 +60,7 @@ export class CreateContentDto {
 
   @ApiProperty({
     description: 'Image metadata',
-    type: ImageDto,
+    type: ImageCreateDto,
     required: false,
     example: {
       height: '720',
@@ -69,9 +69,9 @@ export class CreateContentDto {
     },
   })
   @IsOptional()
-  @Type(() => ImageDto)
+  @Type(() => ImageCreateDto)
   @ValidateNested()
-  image?: ImageDto;
+  image?: ImageCreateDto;
 
   @ApiProperty({
     description: '',

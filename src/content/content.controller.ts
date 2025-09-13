@@ -7,6 +7,7 @@ import {
   Delete,
   ValidationPipe,
   ParseUUIDPipe,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,9 +20,10 @@ import {
 import { GetUser } from '../auth/decorators/user.decorator';
 import { User } from '../users/entities/user.entity';
 import { ContentService } from './content.service';
-import { CreateContentDto } from './dto/create-content.dto';
+import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
 import { ContentDto } from './dto/content.dto';
+import { AddToFolderDto } from './dto/add-to-folder.dto';
 // import { UpdateContentDto } from './dto/update-content.dto';
 
 @ApiTags('content')
@@ -32,15 +34,16 @@ export class ContentController {
 
   @Post()
   @ApiOperation({ summary: 'Create new content' })
-  @ApiBody({ type: CreateContentDto })
-  @ApiResponse({ status: 201, description: 'Content successfully created.' })
-  @ApiResponse({ status: 400, description: 'Bad request.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'Folder not found.' })
+  @ApiBody({ type: ContentCreateDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Content successfully created.',
+    type: ContentDto,
+  })
   async create(
     @GetUser() user: User,
     @Body(ValidationPipe)
-    createContentDto: CreateContentDto,
+    createContentDto: ContentCreateDto,
   ): Promise<ContentDto> {
     // TODO: Add validation for folder ownership
     return this.contentService.create(createContentDto, user.id);
@@ -61,10 +64,11 @@ export class ContentController {
   @Get(':id')
   @ApiOperation({ summary: 'Get content by ID' })
   @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
-  @ApiResponse({ status: 200, description: 'Content successfully retrieved.' })
-  @ApiResponse({ status: 404, description: 'Content not found.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Access denied.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Content successfully retrieved.',
+    type: ContentDto,
+  })
   async findOne(
     @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
@@ -92,10 +96,24 @@ export class ContentController {
   @ApiOperation({ summary: 'Delete content by ID' })
   @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
   @ApiResponse({ status: 200, description: 'Content successfully deleted.' })
-  @ApiResponse({ status: 404, description: 'Content not found.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Access denied.' })
   async remove(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
     return this.contentService.remove(id, user.id);
+  }
+
+  @Put(':id/folder')
+  @ApiOperation({ summary: 'Add content to a folder' })
+  @ApiBody({ type: AddToFolderDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Content successfully added to folder.',
+    type: ContentDto,
+  })
+  async addToFolder(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(ValidationPipe)
+    addToFolderDto: AddToFolderDto,
+  ): Promise<ContentDto> {
+    return this.contentService.addToFolder(id, addToFolderDto, user.id);
   }
 }

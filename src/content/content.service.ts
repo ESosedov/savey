@@ -1,28 +1,31 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 // import { UpdateContentDto } from './dto/update-content.dto';
 import { Content } from './entities/content.entity';
-import { CreateContentDto } from './dto/create-content.dto';
+import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
 import { CursorService } from './services/cursor.service';
 import { ContentDto } from './dto/content.dto';
 import { plainToInstance } from 'class-transformer';
+import { AddToFolderDto } from './dto/add-to-folder.dto';
+import { FoldersService } from '../folders/folders.service';
 
 @Injectable()
 export class ContentService {
   constructor(
     @InjectRepository(Content)
     private readonly contentRepository: Repository<Content>,
+    private readonly folderService: FoldersService,
     private readonly cursorService: CursorService,
   ) {}
 
   async create(
-    createContentDto: CreateContentDto,
+    createContentDto: ContentCreateDto,
     userId: string,
   ): Promise<ContentDto> {
     const content = this.contentRepository.create({
@@ -109,6 +112,38 @@ export class ContentService {
   // }
 
   async findOne(id: string, userId: string): Promise<ContentDto> {
+    const content = await this.findById(id, userId);
+
+    return plainToInstance(ContentDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  async remove(id: string, userId: string): Promise<void> {
+    const content = await this.findById(id, userId);
+
+    await this.contentRepository.remove(content);
+  }
+
+  async addToFolder(
+    id: string,
+    addToFolderDto: AddToFolderDto,
+    userId: string,
+  ): Promise<ContentDto> {
+    const content = await this.findById(id, userId);
+
+    content.folder = await this.folderService.findById(
+      addToFolderDto.folderId,
+      userId,
+    );
+    await this.contentRepository.save(content);
+
+    return plainToInstance(ContentDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  private async findById(id: string, userId: string): Promise<Content> {
     const content = await this.contentRepository.findOne({
       where: { id },
       relations: ['user'],
@@ -122,22 +157,6 @@ export class ContentService {
       throw new ForbiddenException('Access denied to this content');
     }
 
-    return plainToInstance(ContentDto, content, {
-      excludeExtraneousValues: true,
-    });
-  }
-
-  async remove(id: string, userId: string): Promise<void> {
-    const content = await this.contentRepository.findOne({ where: { id } });
-
-    if (!content) {
-      throw new NotFoundException(`Content with ID ${id} not found`);
-    }
-
-    if (content.userId !== userId) {
-      throw new ForbiddenException('You can only delete your own content');
-    }
-
-    await this.contentRepository.remove(content);
+    return content;
   }
 }

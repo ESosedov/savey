@@ -1,28 +1,12 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { ImageData } from '../interfaces/image-data.interface';
-import { IsNumber, IsOptional, IsString, IsUrl } from 'class-validator';
+import { Expose } from 'class-transformer';
 
-export class ImageDto implements ImageData {
-  @ApiProperty({
-    description: 'Height of the image',
-    example: 720,
-  })
-  @IsNumber()
-  height: number;
+export class ImageDto {
+  @Expose()
+  url?: string;
 
-  @ApiProperty({
-    description: 'URL of the image',
-    example: 'https://i.ytimg.com/vi/psAxqfx-plc/maxresdefault.jpg',
-  })
-  @IsString()
-  @IsUrl()
-  url: string;
+  @Expose()
+  width?: number;
 
-  @ApiProperty({
-    description: 'Width of the image',
-    example: 1280,
-  })
-  @IsNumber()
-  @IsOptional()
-  width: number;
+  @Expose()
+  height?: number;
 }
