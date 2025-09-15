@@ -103,7 +103,7 @@ export class FoldersService {
       limit,
       offset,
     );
-console.log(foldersWithImages);
+
     return foldersWithImages.map((folder) =>
       plainToInstance(FolderDto, folder, {
         excludeExtraneousValues: true,
