@@ -15,4 +15,7 @@ export class FolderDto {
 
   @Expose()
   images: string[];
+
+  @Expose()
+  userId: string;
 }

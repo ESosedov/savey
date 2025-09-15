@@ -103,7 +103,7 @@ export class FoldersService {
       limit,
       offset,
     );
-
+console.log(foldersWithImages);
     return foldersWithImages.map((folder) =>
       plainToInstance(FolderDto, folder, {
         excludeExtraneousValues: true,
@@ -145,7 +145,8 @@ export class FoldersService {
       f.id,
       f.title,
       f.description,
-      f.is_public,
+      f.is_public as "isPublic",
+      f.user_id as "userId",
       COALESCE(
         json_agg(recent_content.image_url ORDER BY recent_content.created_at DESC) 
         FILTER (WHERE recent_content.image_url IS NOT NULL),
@@ -161,10 +162,10 @@ export class FoldersService {
       ORDER BY c."created_at" DESC
       LIMIT 7
     ) recent_content ON true
-    WHERE f."user_id" = $1
+    WHERE f.user_id = $1
     ${title ? 'AND LOWER(f.title) LIKE $2' : ''}
-    GROUP BY f.id, f.title, f.description, f."is_public", f."created_at", f."updated_at"
-    ORDER BY f."created_at" DESC
+    GROUP BY f.id, f.title, f.description, f.is_public, f.user_id, f.created_at, f.updated_at
+    ORDER BY f.created_at DESC
     ${limit ? `LIMIT $${title ? '3' : '2'}` : ''}
     ${offset ? `OFFSET $${title ? (limit ? '4' : '3') : limit ? '3' : '2'}` : ''}
   `;
