@@ -46,7 +46,7 @@ export class ContentService {
     data: ContentDto[];
     pagination: { nextCursor: string | null; hasMore: boolean };
   }> {
-    const { cursor, limit = 20, search } = filters;
+    const { cursor, limit = 20, search, folderId } = filters;
 
     let queryBuilder = this.contentRepository
       .createQueryBuilder('content')
@@ -72,6 +72,12 @@ export class ContentService {
         '(content.createdAt, content.id) < (:createdAt, :id)',
         { createdAt, id },
       );
+    }
+
+    if (folderId) {
+      queryBuilder = queryBuilder.andWhere('content.folderId = :folderId', {
+        folderId: filters.folderId,
+      });
     }
     const items = await queryBuilder.getMany();
 
