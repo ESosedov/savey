@@ -7,6 +7,7 @@ import {
   Delete,
   ValidationPipe,
   ParseUUIDPipe,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -76,18 +77,18 @@ export class FoldersController {
     return this.foldersService.findOne(id, user.id);
   }
 
-  // @Patch(':id')
-  // @ApiOperation({ summary: 'Update folder by ID' })
-  // @ApiParam({ name: 'id', description: 'Folder ID', type: 'string' })
-  // @ApiBody({ type: UpdateFolderDto })
-  // @ApiResponse({ status: 200, description: 'Folder successfully updated.' })
-  // async update(
-  //   @GetUser() user: User,
-  //   @Param('id', ParseUUIDPipe) id: string,
-  //   @Body(ValidationPipe) updateFolderDto: UpdateFolderDto,
-  // ) {
-  //   return this.foldersService.update(id, updateFolderDto, user.id);
-  // }
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update folder by ID' })
+  @ApiParam({ name: 'id', description: 'Folder ID', type: 'string' })
+  @ApiBody({ type: UpdateFolderDto })
+  @ApiResponse({ status: 200, description: 'Folder successfully updated.' })
+  async update(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(ValidationPipe) updateFolderDto: UpdateFolderDto,
+  ): Promise<FolderDto | null> {
+    return this.foldersService.update(id, updateFolderDto, user.id);
+  }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete folder by ID' })

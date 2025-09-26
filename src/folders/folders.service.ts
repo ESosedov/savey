@@ -34,24 +34,18 @@ export class FoldersService {
     });
   }
 
-  // async update(
-  //   id: string,
-  //   updateFolderDto: UpdateFolderDto,
-  //   userId: string,
-  // ): Promise<Folder> {
-  //   const folder = await this.folderRepository.findOne({ where: { id } });
-  //
-  //   if (!folder) {
-  //     throw new NotFoundException(`Folder with ID ${id} not found`);
-  //   }
-  //
-  //   if (folder.userId !== userId) {
-  //     throw new ForbiddenException('You can only edit your own folders');
-  //   }
-  //
-  //   Object.assign(folder, updateFolderDto);
-  //   return await this.folderRepository.save(folder);
-  // }
+  async update(
+    id: string,
+    updateFolderDto: UpdateFolderDto,
+    userId: string,
+  ): Promise<FolderDto | null> {
+    const folder = await this.findById(id, userId);
+
+    Object.assign(folder, updateFolderDto);
+    await this.folderRepository.save(folder);
+
+    return this.findOne(id, userId);
+  }
 
   async findOne(id: string, userId?: string): Promise<FolderDto | null> {
     const result = await this.folderRepository

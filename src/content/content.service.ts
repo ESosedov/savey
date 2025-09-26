@@ -14,6 +14,7 @@ import { ContentDto } from './dto/content.dto';
 import { plainToInstance } from 'class-transformer';
 import { AddToFolderDto } from './dto/add-to-folder.dto';
 import { FoldersService } from '../folders/folders.service';
+import { UpdateContentDto } from './dto/update-content.dto';
 
 @Injectable()
 export class ContentService {
@@ -98,24 +99,20 @@ export class ContentService {
     };
   }
 
-  // async update(
-  //   id: string,
-  //   updateContentDto: UpdateContentDto,
-  //   userId: string,
-  // ): Promise<Content> {
-  //   const content = await this.contentRepository.findOne({ where: { id } });
-  //
-  //   if (!content) {
-  //     throw new NotFoundException(`Content with ID ${id} not found`);
-  //   }
-  //
-  //   if (content.userId !== userId) {
-  //     throw new ForbiddenException('You can only edit your own content');
-  //   }
-  //
-  //   Object.assign(content, updateContentDto);
-  //   return await this.contentRepository.save(content);
-  // }
+  async update(
+    id: string,
+    updateContentDto: UpdateContentDto,
+    userId: string,
+  ): Promise<ContentDto> {
+    const content = await this.findById(id, userId);
+
+    Object.assign(content, updateContentDto);
+    const updateContent = await this.contentRepository.save(content);
+
+    return plainToInstance(ContentDto, updateContent, {
+      excludeExtraneousValues: true,
+    });
+  }
 
   async findOne(id: string, userId: string): Promise<ContentDto> {
     const content = await this.findById(id, userId);

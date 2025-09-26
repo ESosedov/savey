@@ -8,6 +8,7 @@ import {
   ValidationPipe,
   ParseUUIDPipe,
   Put,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,7 +25,7 @@ import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
 import { ContentDto } from './dto/content.dto';
 import { AddToFolderDto } from './dto/add-to-folder.dto';
-// import { UpdateContentDto } from './dto/update-content.dto';
+import { UpdateContentDto } from './dto/update-content.dto';
 
 @ApiTags('content')
 @ApiBearerAuth()
@@ -76,21 +77,21 @@ export class ContentController {
     return this.contentService.findOne(id, user.id);
   }
 
-  // @Patch(':id')
-  // @ApiOperation({ summary: 'Update content by ID' })
-  // @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
-  // @ApiBody({ type: UpdateContentDto })
-  // @ApiResponse({ status: 200, description: 'Content successfully updated.' })
-  // @ApiResponse({ status: 404, description: 'Content not found.' })
-  // @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  // @ApiResponse({ status: 403, description: 'Access denied.' })
-  // async update(
-  //   @GetUser() user: User,
-  //   @Param('id', ParseUUIDPipe) id: string,
-  //   @Body(ValidationPipe) updateContentDto: UpdateContentDto,
-  // ) {
-  //   return this.contentService.update(id, updateContentDto, user.id);
-  // }
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update content by ID' })
+  @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
+  @ApiBody({ type: UpdateContentDto })
+  @ApiResponse({ status: 200, description: 'Content successfully updated.' })
+  @ApiResponse({ status: 404, description: 'Content not found.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Access denied.' })
+  async update(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(ValidationPipe) updateContentDto: UpdateContentDto,
+  ): Promise<ContentDto> {
+    return this.contentService.update(id, updateContentDto, user.id);
+  }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete content by ID' })
