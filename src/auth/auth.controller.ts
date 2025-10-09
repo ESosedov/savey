@@ -20,7 +20,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('login/google')
+  @Post('google')
   @ApiOperation({
     summary: 'Google Login',
     description: 'Login with Google user data to get access token',
