@@ -3,13 +3,24 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 import { User } from '../users/entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import { OAuth2Client } from 'google-auth-library';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
+  private googleClient: OAuth2Client;
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new Error('GOOGLE_CLIENT_ID is not configured');
+    }
+    this.googleClient = new OAuth2Client(clientId);
+  }
 
   async login(
     email: string,
@@ -25,25 +36,35 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  async googleLogin(googleUserData: {
-    id: string;
-    name: string | null;
-    email: string;
-    photo: string | null;
-    familyName: string | null;
-    givenName: string | null;
-  }): Promise<{ accessToken: string }> {
-    const googleData = {
-      email: googleUserData.email,
-      firstName: googleUserData.givenName || googleUserData.name || '',
-      lastName: googleUserData.familyName || '',
-      providerId: googleUserData.id,
-      picture: googleUserData.photo || undefined,
-    };
+  async googleLogin(idToken: string): Promise<{ accessToken: string }> {
+    try {
+      // Verify the ID token with Google
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      });
 
-    const user = await this.usersService.findOrCreateGoogleUser(googleData);
+      const payload = ticket.getPayload();
+      if (!payload) {
+        throw new UnauthorizedException('Invalid Google token');
+      }
 
-    return this.generateToken(user);
+      // Extract verified user data from the token
+      const googleData = {
+        email: payload.email || '',
+        firstName: payload.given_name || payload.name || '',
+        lastName: payload.family_name || '',
+        providerId: payload.sub,
+        picture: payload.picture || undefined,
+      };
+
+      // Find or create user with verified data
+      const user = await this.usersService.findOrCreateGoogleUser(googleData);
+
+      return this.generateToken(user);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid Google token');
+    }
   }
 
   private generateToken(user: User): { accessToken: string } {

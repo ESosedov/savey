@@ -23,11 +23,11 @@ export class AuthController {
   @Post('google')
   @ApiOperation({
     summary: 'Google Login',
-    description: 'Login with Google user data to get access token',
+    description: 'Login with Google ID Token to get access token',
   })
   async googleLogin(
-    @Body() googleUserData: GoogleLoginDto,
+    @Body() { idToken }: GoogleLoginDto,
   ): Promise<{ accessToken: string }> {
-    return this.authService.googleLogin(googleUserData);
+    return this.authService.googleLogin(idToken);
   }
 }
