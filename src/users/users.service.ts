@@ -68,4 +68,60 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     return await this.userRepository.findOne({ where: { email } });
   }
+
+  async findOrCreateGoogleUser(googleData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    providerId: string;
+    picture?: string;
+  }): Promise<User> {
+    let user = await this.findByEmail(googleData.email);
+
+    if (user) {
+      const hasGoogleProvider = user.oauthProviders?.some(
+        (provider) =>
+          provider.provider === 'google' &&
+          provider.providerId === googleData.providerId,
+      );
+
+      if (!hasGoogleProvider) {
+        const oauthProviders = user.oauthProviders || [];
+        oauthProviders.push({
+          provider: 'google',
+          providerId: googleData.providerId,
+          picture: googleData.picture,
+        });
+        user.oauthProviders = oauthProviders;
+        user = await this.userRepository.save(user);
+      }
+    } else {
+      user = this.userRepository.create({
+        email: googleData.email,
+        firstName: googleData.firstName,
+        lastName: googleData.lastName,
+        passwordHash: '',
+        oauthProviders: [
+          {
+            provider: 'google',
+            providerId: googleData.providerId,
+            picture: googleData.picture,
+          },
+        ],
+      });
+      const savedUser = await this.userRepository.save(user);
+
+      const favoriteFolder = this.folderRepository.create({
+        title: 'Favorite',
+        isPublic: false,
+        userId: savedUser.id,
+        user: savedUser,
+      });
+      await this.folderRepository.save(favoriteFolder);
+
+      user = savedUser;
+    }
+
+    return user;
+  }
 }

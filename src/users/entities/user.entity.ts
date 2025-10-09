@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Folder } from '../../folders/entities/folder.entity';
 import { Content } from '../../content/entities/content.entity';
+import { OAuthProvider } from '../interfaces/oauth-provider.interface';
 
 @Entity('users')
 export class User {
@@ -36,6 +37,9 @@ export class User {
 
   @OneToMany(() => Content, (content) => content.user)
   content: Content[];
+
+  @Column('jsonb', { default: [] })
+  oauthProviders: OAuthProvider[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -25,7 +25,28 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  generateToken(user: User): { accessToken: string } {
+  async googleLogin(googleUserData: {
+    id: string;
+    name: string | null;
+    email: string;
+    photo: string | null;
+    familyName: string | null;
+    givenName: string | null;
+  }): Promise<{ accessToken: string }> {
+    const googleData = {
+      email: googleUserData.email,
+      firstName: googleUserData.givenName || googleUserData.name || '',
+      lastName: googleUserData.familyName || '',
+      providerId: googleUserData.id,
+      picture: googleUserData.photo || undefined,
+    };
+
+    const user = await this.usersService.findOrCreateGoogleUser(googleData);
+
+    return this.generateToken(user);
+  }
+
+  private generateToken(user: User): { accessToken: string } {
     const payload = { sub: user.id, email: user.email };
     const accessToken = this.jwtService.sign(payload);
     return { accessToken };
