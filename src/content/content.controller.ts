@@ -117,4 +117,21 @@ export class ContentController {
   ): Promise<ContentDto> {
     return this.contentService.addToFolder(id, addToFolderDto, user.id);
   }
+
+  @Delete(':id/folder/:folderId')
+  @ApiOperation({ summary: 'Remove content from a folder' })
+  @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
+  @ApiParam({ name: 'folderId', description: 'Folder ID', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Content successfully removed from folder.',
+    type: ContentDto,
+  })
+  async removeFromFolder(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('folderId', ParseUUIDPipe) folderId: string,
+  ): Promise<ContentDto> {
+    return this.contentService.removeFromFolder(id, folderId, user.id);
+  }
 }

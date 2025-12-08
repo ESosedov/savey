@@ -5,7 +5,7 @@ import {
   Generated,
   JoinColumn,
   ManyToOne,
-  OneToMany,
+  ManyToMany,
   PrimaryColumn,
   Unique,
   UpdateDateColumn,
@@ -33,7 +33,7 @@ export class Folder {
   @Column('uuid')
   userId: string;
 
-  @OneToMany(() => Content, (content) => content.folder)
+  @ManyToMany(() => Content, (content) => content.folders)
   content: Content[];
 
   @Column('text', { nullable: true })

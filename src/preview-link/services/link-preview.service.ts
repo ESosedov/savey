@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { getLinkPreview } from 'link-preview-js';
 import { LinkPreviewOptions } from '../interfaces/link-preview.interface';
-import probe from 'probe-image-size';
 import { ContentDto } from '../dto/content.dto';
+import { ImageDataService } from './image-data.service';
+import { ImageData } from '../../content/interfaces/image-data.interface';
 
 @Injectable()
 export class LinkPreviewService {
   private readonly logger = new Logger(LinkPreviewService.name);
+
+  constructor(private readonly imageDataService: ImageDataService) {}
 
   async getPreview(
     url: string,
@@ -26,7 +29,7 @@ export class LinkPreviewService {
       };
 
       const result = await getLinkPreview(url, requestOptions);
-      let imageData = null;
+      let imageData: null | ImageData = null;
       if ('images' in result) {
         const hasValidImages =
           result?.images &&
@@ -39,28 +42,38 @@ export class LinkPreviewService {
 
       return this.mapToDto(result, imageData);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to get link preview for ${url}: ${error.message}`,
+        `Failed to get link preview for ${url}: ${errorMessage}`,
       );
       return null;
     }
   }
 
-  async getImageData(image: any): Promise<any> {
+  async getImageData(image: string[]): Promise<ImageData | null> {
     try {
-      const result = await probe(image[0]);
-      return {
-        width: Number(result.width),
-        height: Number(result.height),
-        url: result.url,
-      };
+      return this.imageDataService.downloadAndStoreImage(image[0]);
     } catch (error) {
-      console.error('Error get image:', error.message);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error get image:', errorMessage);
       return null;
     }
+    // try {
+    //   const result = await probe(image[0]);
+    //   return {
+    //     width: Number(result.width),
+    //     height: Number(result.height),
+    //     url: result.url,
+    //   };
+    // } catch (error) {
+    //   console.error('Error get image:', error.message);
+    //   return null;
+    // }
   }
 
-  private mapToDto(result: any, imageData?: any): ContentDto {
+  private mapToDto(result: any, imageData?: ImageData | null): ContentDto {
     let image = result.ogImage;
     if (imageData) {
       image = imageData;

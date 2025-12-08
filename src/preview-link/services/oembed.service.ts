@@ -1,8 +1,13 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ContentDto } from '../dto/content.dto';
+import { ImageDataService } from './image-data.service';
+import { ImageData } from '../../content/interfaces/image-data.interface';
 
+@Injectable()
 export class OembedService {
   private readonly logger = new Logger(OembedService.name);
+
+  constructor(private readonly imageDataService: ImageDataService) {}
 
   public async getPreview(url: string): Promise<ContentDto | null> {
     try {
@@ -50,25 +55,27 @@ export class OembedService {
       }
 
       const data = await response.json();
+      let imageData: ImageData | null = null;
+      const thumbnailUrl = data.thumbnail_url;
+      if (thumbnailUrl && typeof thumbnailUrl === 'string') {
+        imageData =
+          await this.imageDataService.downloadAndStoreImage(thumbnailUrl);
+      }
 
       return {
         title: data.title,
         description: `${data.author_name} - YouTube`,
-        image: data.thumbnail_url
-          ? {
-              url: data.thumbnail_url,
-              width: data.thumbnail_width,
-              height: data.thumbnail_height,
-            }
-          : null,
+        image: imageData,
         url: url,
         type: 'video.other',
         siteName: 'YouTube',
         favicon: 'https://www.youtube.com/favicon.ico',
       } as ContentDto;
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to get link preview for ${url}: ${error.message}`,
+        `Failed to get link preview for ${url}: ${errorMessage}`,
       );
       throw error;
     }

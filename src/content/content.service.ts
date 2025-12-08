@@ -51,6 +51,7 @@ export class ContentService {
 
     let queryBuilder = this.contentRepository
       .createQueryBuilder('content')
+      .leftJoinAndSelect('content.folders', 'folders')
       .where('content.userId = :userId', { userId })
       .orderBy('content.createdAt', 'DESC')
       .addOrderBy('content.id', 'DESC')
@@ -76,9 +77,11 @@ export class ContentService {
     }
 
     if (folderId) {
-      queryBuilder = queryBuilder.andWhere('content.folderId = :folderId', {
-        folderId: filters.folderId,
-      });
+      queryBuilder = queryBuilder
+        .innerJoin('content.folders', 'filterFolders')
+        .andWhere('filterFolders.id = :folderId', {
+          folderId: filters.folderId,
+        });
     }
     const items = await queryBuilder.getMany();
 
@@ -115,7 +118,7 @@ export class ContentService {
   }
 
   async findOne(id: string, userId: string): Promise<ContentDto> {
-    const content = await this.findById(id, userId);
+    const content = await this.findById(id, userId, ['user', 'folders']);
 
     return plainToInstance(ContentDto, content, {
       excludeExtraneousValues: true,
@@ -133,12 +136,34 @@ export class ContentService {
     addToFolderDto: AddToFolderDto,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findById(id, userId);
+    const content = await this.findById(id, userId, ['folders']);
 
-    content.folder = await this.folderService.findById(
+    const folder = await this.folderService.findById(
       addToFolderDto.folderId,
       userId,
     );
+
+    // Check if folder is already added
+    if (!content.folders.some((f) => f.id === folder.id)) {
+      content.folders.push(folder);
+      await this.contentRepository.save(content);
+    }
+
+    return plainToInstance(ContentDto, content, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  async removeFromFolder(
+    id: string,
+    folderId: string,
+    userId: string,
+  ): Promise<ContentDto> {
+    const content = await this.findById(id, userId, ['folders']);
+
+    await this.folderService.findById(folderId, userId);
+
+    content.folders = content.folders.filter((f) => f.id !== folderId);
     await this.contentRepository.save(content);
 
     return plainToInstance(ContentDto, content, {
@@ -146,10 +171,14 @@ export class ContentService {
     });
   }
 
-  private async findById(id: string, userId: string): Promise<Content> {
+  private async findById(
+    id: string,
+    userId: string,
+    relations: string[] = ['user'],
+  ): Promise<Content> {
     const content = await this.contentRepository.findOne({
       where: { id },
-      relations: ['user'],
+      relations,
     });
 
     if (!content) {

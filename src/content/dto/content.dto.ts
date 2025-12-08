@@ -1,4 +1,4 @@
-import { Exclude, Expose, Type } from 'class-transformer';
+import { Exclude, Expose, Transform, Type } from 'class-transformer';
 import { User } from '../../users/entities/user.entity';
 import { Folder } from '../../folders/entities/folder.entity';
 import { ImageDto } from './image.dto';
@@ -23,10 +23,11 @@ export class ContentDto {
   userId: string;
 
   @Exclude()
-  folder: Folder;
+  folders: Folder[];
 
   @Expose()
-  folderId: string;
+  @Transform(({ obj }) => obj.folders?.map((f: Folder) => f.id) || [])
+  folderIds: string[];
 
   @Expose()
   favicon?: string | null;

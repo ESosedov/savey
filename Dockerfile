@@ -1,24 +1,32 @@
-FROM node:22-alpine
+# Build stage
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Копирование package.json и package-lock.json
 COPY package*.json ./
-
-# Установка всех зависимостей (включая devDependencies для сборки)
 RUN npm ci
 
-# Копирование исходного кода
 COPY . .
-
-# Сборка приложения
 RUN npm run build
 
-# Удаление devDependencies после сборки (опционально)
-RUN npm prune --production
+# Production stage
+FROM node:20-alpine
 
-# Открытие порта
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+COPY --from=builder /app/dist ./dist
+
+# Копируем datasource.config для миграций
+COPY --from=builder /app/datasource.config.ts ./datasource.config.ts
+
+# Копируем package.json для команд миграций
+COPY --from=builder /app/package.json ./package.json
+
 EXPOSE 3000
 
-# Запуск приложения
-CMD ["npm", "run", "start:prod"]
+ENV NODE_ENV=production
+
+CMD ["sh", "-c", "npm run migration:run && node dist/src/main"]

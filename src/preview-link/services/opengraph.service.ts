@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import ogs from 'open-graph-scraper';
 import { ContentDto } from '../dto/content.dto';
 import { ImageDataService } from './image-data.service';
+import { ImageData } from '../../content/interfaces/image-data.interface';
+import { OgObjectInternal } from 'open-graph-scraper/types';
 
 @Injectable()
 export class OpenGraphService {
@@ -44,28 +46,30 @@ export class OpenGraphService {
         return null;
       }
 
-      const imageData = await this.imageDataService.getImageData(
-        result.ogImage,
-      );
+      const imageData =
+        await this.imageDataService.downloadAndStoreImageFromArray(
+          result.ogImage,
+        );
 
       return this.mapToDto(result, imageData);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Failed to get link preview for ${url}: ${error.message}`,
+        `Failed to get link preview for ${url}: ${errorMessage}`,
       );
       return null;
     }
   }
 
-  private mapToDto(result: any, imageData?: any): ContentDto {
-    let image = result.ogImage;
-    if (imageData) {
-      image = imageData;
-    }
+  private mapToDto(
+    result: OgObjectInternal,
+    imageData?: ImageData | null,
+  ): ContentDto {
     return {
       title: result.ogTitle,
       description: result.ogDescription,
-      image: image,
+      image: imageData,
       url: result.ogUrl,
       type: result.ogType,
       siteName: result.ogSiteName,

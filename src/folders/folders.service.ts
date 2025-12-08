@@ -54,10 +54,11 @@ export class FoldersService {
         'folder.content',
         'content',
         `content.image IS NOT NULL AND content.id IN (
-        SELECT c2.id FROM content c2 
-        WHERE c2.folder_id = folder.id 
+        SELECT c2.id FROM content c2
+        INNER JOIN content_folders cf ON cf."contentId" = c2.id
+        WHERE cf."folderId" = folder.id
         AND c2.image IS NOT NULL
-        ORDER BY c2.created_at DESC 
+        ORDER BY c2.created_at DESC
         LIMIT 7
       )`,
       )
@@ -135,24 +136,25 @@ export class FoldersService {
     offset?: number,
   ): Promise<any[]> {
     const query = `
-    SELECT 
+    SELECT
       f.id,
       f.title,
       f.description,
       f.is_public as "isPublic",
       f.user_id as "userId",
       COALESCE(
-        json_agg(recent_content.image_url ORDER BY recent_content.created_at DESC) 
+        json_agg(recent_content.image_url ORDER BY recent_content.created_at DESC)
         FILTER (WHERE recent_content.image_url IS NOT NULL),
         '[]'
       ) as "images"
     FROM folders f
     LEFT JOIN LATERAL (
-      SELECT 
+      SELECT
         c.image->>'url' as image_url,
         c."created_at" as created_at
-      FROM content c 
-      WHERE c."folder_id" = f.id AND c.image IS NOT NULL
+      FROM content c
+      INNER JOIN content_folders cf ON cf."contentId" = c.id
+      WHERE cf."folderId" = f.id AND c.image IS NOT NULL
       ORDER BY c."created_at" DESC
       LIMIT 7
     ) recent_content ON true

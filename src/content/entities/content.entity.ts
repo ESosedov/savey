@@ -6,7 +6,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  ManyToMany,
   JoinColumn,
+  JoinTable,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Folder } from '../../folders/entities/folder.entity';
@@ -34,17 +36,18 @@ export class Content {
   @Column('uuid')
   userId: string;
 
-  @ManyToOne(() => Folder, (folder) => folder.content, { nullable: true })
-  @JoinColumn()
-  folder: Folder | null;
+  @ManyToMany(() => Folder, (folder) => folder.content)
+  @JoinTable({
+    name: 'content_folders',
+    joinColumn: { name: 'contentId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'folderId', referencedColumnName: 'id' },
+  })
+  folders: Folder[];
 
-  @Column('uuid', { nullable: true })
-  folderId: string | null;
-
-  @Column('text', { nullable: true }) // исправлено
+  @Column('text', { nullable: true })
   favicon: string | null;
 
-  @Column('text', { nullable: true }) // исправлено
+  @Column('text', { nullable: true })
   siteName: string | null;
 
   @Column('jsonb', { nullable: true })
