@@ -26,12 +26,18 @@ import { ContentFilterDto } from './dto/content-filter.dto';
 import { ContentDto } from './dto/content.dto';
 import { AddToFolderDto } from './dto/add-to-folder.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
+import { SimilarContentService } from './services/similar-content.service';
+import { SimilarContentCreateDto } from './dto/similar-content/similar-content-create.dto';
+import { SimilarContentDto } from './dto/similar-content/similar-content.dto';
 
 @ApiTags('content')
 @ApiBearerAuth()
 @Controller('content')
 export class ContentController {
-  constructor(private readonly contentService: ContentService) {}
+  constructor(
+    private readonly contentService: ContentService,
+    private readonly similarContentService: SimilarContentService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create new content' })
@@ -133,5 +139,40 @@ export class ContentController {
     @Param('folderId', ParseUUIDPipe) folderId: string,
   ): Promise<ContentDto> {
     return this.contentService.removeFromFolder(id, folderId, user.id);
+  }
+
+  @Post(':id/similar/add')
+  @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
+  @ApiBody({ type: [SimilarContentCreateDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Similar Content successfully added.',
+    type: [SimilarContentDto],
+  })
+  async addSimilar(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(ValidationPipe)
+    similarContentCreateDto: SimilarContentCreateDto[],
+  ): Promise<SimilarContentDto[]> {
+    return this.similarContentService.addSimilar(
+      id,
+      user.id,
+      similarContentCreateDto,
+    );
+  }
+
+  @Get(':id/similar/get')
+  @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
+  @ApiResponse({
+    status: 200,
+    description: 'Similar Content for content.',
+    type: [SimilarContentDto],
+  })
+  async getSimilar(
+    @GetUser() user: User,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SimilarContentDto[]> {
+    return this.similarContentService.getSimilar(id, user.id);
   }
 }

@@ -171,7 +171,7 @@ export class ContentService {
     });
   }
 
-  private async findById(
+  public async findById(
     id: string,
     userId: string,
     relations: string[] = ['user'],
