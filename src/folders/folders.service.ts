@@ -106,6 +106,27 @@ export class FoldersService {
     );
   }
 
+  async getPublicList(
+    filters: FolderFilterDto,
+    userId: string,
+  ): Promise<FolderDto[]> {
+    const page = 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const foldersWithImages = await this.findPublicFoldersWithRecentImages(
+      userId,
+      filters.search,
+      limit,
+      offset,
+    );
+
+    return foldersWithImages.map((folder) =>
+      plainToInstance(FolderDto, folder, {
+        excludeExtraneousValues: true,
+      }),
+    );
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const folder = await this.findById(id, userId);
 
@@ -159,6 +180,61 @@ export class FoldersService {
       LIMIT 7
     ) recent_content ON true
     WHERE f.user_id = $1
+    ${title ? 'AND LOWER(f.title) LIKE $2' : ''}
+    GROUP BY f.id, f.title, f.description, f.is_public, f.user_id, f.created_at, f.updated_at
+    ORDER BY f.created_at DESC
+    ${limit ? `LIMIT $${title ? '3' : '2'}` : ''}
+    ${offset ? `OFFSET $${title ? (limit ? '4' : '3') : limit ? '3' : '2'}` : ''}
+  `;
+
+    const params: any[] = [userId];
+
+    if (title) {
+      params.push(`%${title.toLowerCase()}%`);
+    }
+
+    if (limit) {
+      params.push(limit);
+    }
+
+    if (offset) {
+      params.push(offset);
+    }
+
+    return await this.folderRepository.query(query, params);
+  }
+
+  private async findPublicFoldersWithRecentImages(
+    userId: string,
+    title?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<any[]> {
+    const query = `
+    SELECT
+      f.id,
+      f.title,
+      f.description,
+      f.is_public as "isPublic",
+      f.user_id as "userId",
+      COALESCE(
+        json_agg(recent_content.image_url ORDER BY recent_content.created_at DESC)
+        FILTER (WHERE recent_content.image_url IS NOT NULL),
+        '[]'
+      ) as "images"
+    FROM folders f
+    LEFT JOIN LATERAL (
+      SELECT
+        c.image->>'url' as image_url,
+        c."created_at" as created_at
+      FROM content c
+      INNER JOIN content_folders cf ON cf."contentId" = c.id
+      WHERE cf."folderId" = f.id AND c.image IS NOT NULL
+      ORDER BY c."created_at" DESC
+      LIMIT 7
+    ) recent_content ON true
+    WHERE f.user_id != $1
+      AND f.is_public IS TRUE
     ${title ? 'AND LOWER(f.title) LIKE $2' : ''}
     GROUP BY f.id, f.title, f.description, f.is_public, f.user_id, f.created_at, f.updated_at
     ORDER BY f.created_at DESC

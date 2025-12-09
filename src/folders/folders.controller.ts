@@ -62,6 +62,21 @@ export class FoldersController {
     return this.foldersService.getList(filters, user.id);
   }
 
+  @Post('list/public')
+  @ApiOperation({ summary: 'Get list of folders' })
+  @ApiBody({ type: FolderFilterDto })
+  @ApiResponse({
+    status: 200,
+    description: 'List of public folders successfully retrieved.',
+    type: [FolderDto],
+  })
+  async getPublicList(
+    @GetUser() user: User,
+    @Body(ValidationPipe) filters: FolderFilterDto,
+  ): Promise<FolderDto[]> {
+    return this.foldersService.getPublicList(filters, user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get folder by ID' })
   @ApiParam({ name: 'id', description: 'Folder ID', type: 'string' })

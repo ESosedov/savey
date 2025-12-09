@@ -4,15 +4,12 @@ import {
   Post,
   Body,
   Patch,
-  Param,
   ValidationPipe,
-  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiParam,
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
