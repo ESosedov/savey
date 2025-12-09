@@ -6,6 +6,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Folder } from '../folders/entities/folder.entity';
 import * as bcrypt from 'bcrypt';
+import { UserDto } from './dto/user.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class UsersService {
@@ -16,7 +18,7 @@ export class UsersService {
     private readonly folderRepository: Repository<Folder>,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
+  async create(createUserDto: CreateUserDto): Promise<UserDto> {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(createUserDto.password, saltRounds);
     const user = this.userRepository.create({
@@ -33,12 +35,22 @@ export class UsersService {
     });
     await this.folderRepository.save(favoriteFolder);
 
-    return savedUser;
+    return plainToInstance(UserDto, savedUser, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async findAll(): Promise<User[]> {
     return await this.userRepository.find({
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getOne(id: string): Promise<UserDto> {
+    const user = await this.findOne(id);
+
+    return plainToInstance(UserDto, user, {
+      excludeExtraneousValues: true,
     });
   }
 
@@ -52,12 +64,15 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
     const user = await this.findOne(id);
 
     Object.assign(user, updateUserDto);
+    const savedUser = await this.userRepository.save(user);
 
-    return await this.userRepository.save(user);
+    return plainToInstance(UserDto, savedUser, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async remove(id: string): Promise<void> {
