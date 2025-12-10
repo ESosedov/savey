@@ -110,7 +110,7 @@ export class ContentService {
     updateContentDto: UpdateContentDto,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findByIdAndUser(id, userId);
+    const content = await this.findOwned(id, userId);
 
     Object.assign(content, updateContentDto);
     const updateContent = await this.contentRepository.save(content);
@@ -120,21 +120,8 @@ export class ContentService {
     });
   }
 
-  async findOne(id: string, userId: string): Promise<ContentDto> {
-    const content = await this.contentRepository.findOne({
-      where: { id },
-      relations: ['user', 'folders'],
-    });
-
-    if (!content) {
-      throw new NotFoundException(`Content with ID ${id} not found`);
-    }
-
-    const isPublicFolder = content.folders.some((folder) => folder.isPublic);
-
-    if (content.userId !== userId && !isPublicFolder) {
-      throw new ForbiddenException('Access denied to this content');
-    }
+  async getOne(id: string, userId: string): Promise<ContentDto> {
+    const content = await this.findPublicOrOwned(id, userId);
 
     return plainToInstance(ContentDto, content, {
       excludeExtraneousValues: true,
@@ -142,7 +129,7 @@ export class ContentService {
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    const content = await this.findByIdAndUser(id, userId);
+    const content = await this.findOwned(id, userId);
 
     await this.contentRepository.remove(content);
   }
@@ -152,7 +139,7 @@ export class ContentService {
     addToFolderDto: AddToFolderDto,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findByIdAndUser(id, userId, ['folders']);
+    const content = await this.findOwned(id, userId, ['folders']);
 
     const folder = await this.folderService.findById(
       addToFolderDto.folderId,
@@ -175,7 +162,7 @@ export class ContentService {
     folderId: string,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findByIdAndUser(id, userId, ['folders']);
+    const content = await this.findOwned(id, userId, ['folders']);
 
     await this.folderService.findById(folderId, userId);
 
@@ -187,7 +174,7 @@ export class ContentService {
     });
   }
 
-  public async findByIdAndUser(
+  public async findOwned(
     id: string,
     userId: string,
     relations: string[] = ['user'],
@@ -202,6 +189,25 @@ export class ContentService {
     }
 
     if (content.userId !== userId) {
+      throw new ForbiddenException('Access denied to this content');
+    }
+
+    return content;
+  }
+
+  async findPublicOrOwned(id: string, userId: string): Promise<Content> {
+    const content = await this.contentRepository.findOne({
+      where: { id },
+      relations: ['user', 'folders'],
+    });
+
+    if (!content) {
+      throw new NotFoundException(`Content with ID ${id} not found`);
+    }
+
+    const isPublicFolder = content.folders.some((folder) => folder.isPublic);
+
+    if (content.userId !== userId && !isPublicFolder) {
       throw new ForbiddenException('Access denied to this content');
     }
 

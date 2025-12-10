@@ -80,7 +80,7 @@ export class ContentController {
     @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ContentDto> {
-    return this.contentService.findOne(id, user.id);
+    return this.contentService.getOne(id, user.id);
   }
 
   @Patch(':id')
