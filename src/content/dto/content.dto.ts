@@ -2,6 +2,7 @@ import { Exclude, Expose, Transform, Type } from 'class-transformer';
 import { User } from '../../users/entities/user.entity';
 import { Folder } from '../../folders/entities/folder.entity';
 import { ImageDto } from './image.dto';
+import { SimilarContentDto } from './similar-content/similar-content.dto';
 
 export class ContentDto {
   @Expose()
@@ -50,4 +51,8 @@ export class ContentDto {
 
   @Exclude()
   updatedAt: Date;
+
+  @Expose()
+  @Type(() => SimilarContentDto)
+  similar: SimilarContentDto[];
 }

@@ -28,7 +28,7 @@ import { PreviewLinkModule } from './preview-link/preview-link.module';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
         migrations: ['dist/migrations/*.js'],
-        logging: true,
+        logging: ['error', 'warn', 'schema'],
         namingStrategy: new SnakeNamingStrategy(),
       }),
       inject: [ConfigService],

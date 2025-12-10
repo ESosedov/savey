@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { OauthProvider } from './oauthProvider';
+import { OauthProviderDto } from './oauthProvider.dto';
 
 export class UserDto {
   @Expose()
@@ -14,6 +14,6 @@ export class UserDto {
   createdAt: Date;
 
   @Expose()
-  @Type(() => OauthProvider)
-  oauthProviders: OauthProvider[];
+  @Type(() => OauthProviderDto)
+  oauthProviders: OauthProviderDto[];
 }

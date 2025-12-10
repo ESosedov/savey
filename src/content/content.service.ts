@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-// import { UpdateContentDto } from './dto/update-content.dto';
 import { Content } from './entities/content.entity';
 import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
@@ -15,6 +14,7 @@ import { plainToInstance } from 'class-transformer';
 import { AddToFolderDto } from './dto/add-to-folder.dto';
 import { FoldersService } from '../folders/folders.service';
 import { UpdateContentDto } from './dto/update-content.dto';
+import { SimilarContent } from './entities/similar-content.entity';
 
 @Injectable()
 export class ContentService {
@@ -23,6 +23,8 @@ export class ContentService {
     private readonly contentRepository: Repository<Content>,
     private readonly folderService: FoldersService,
     private readonly cursorService: CursorService,
+    @InjectRepository(SimilarContent)
+    private readonly similarContentRepository: Repository<SimilarContent>,
   ) {}
 
   async create(
@@ -122,10 +124,17 @@ export class ContentService {
 
   async getOne(id: string, userId: string): Promise<ContentDto> {
     const content = await this.findPublicOrOwned(id, userId);
-
-    return plainToInstance(ContentDto, content, {
-      excludeExtraneousValues: true,
+    const similar = await this.similarContentRepository.find({
+      where: { content: { id: content.id } },
     });
+
+    return plainToInstance(
+      ContentDto,
+      { ...content, similar },
+      {
+        excludeExtraneousValues: true,
+      },
+    );
   }
 
   async remove(id: string, userId: string): Promise<void> {

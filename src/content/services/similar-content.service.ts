@@ -37,15 +37,7 @@ export class SimilarContentService {
     });
   }
 
-  async getSimilar(
-    contentId: string,
-    userId: string,
-  ): Promise<SimilarContentDto[]> {
-    const content: Content = await this.contentService.findPublicOrOwned(
-      contentId,
-      userId,
-    );
-
+  async getSimilar(content: Content): Promise<SimilarContentDto[]> {
     const similarContent = await this.similarContentRepository.find({
       where: { content: { id: content.id } },
     });

@@ -1,6 +1,6 @@
 import { Expose } from 'class-transformer';
 
-export class OauthProvider {
+export class OauthProviderDto {
   @Expose()
   provider: string;
   @Expose()

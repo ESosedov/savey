@@ -161,18 +161,4 @@ export class ContentController {
       similarContentCreateDto,
     );
   }
-
-  @Get(':id/similar/get')
-  @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
-  @ApiResponse({
-    status: 200,
-    description: 'Similar Content for content.',
-    type: [SimilarContentDto],
-  })
-  async getSimilar(
-    @GetUser() user: User,
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<SimilarContentDto[]> {
-    return this.similarContentService.getSimilar(id, user.id);
-  }
 }
