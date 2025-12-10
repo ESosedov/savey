@@ -52,7 +52,10 @@ export class ContentService {
     let queryBuilder = this.contentRepository
       .createQueryBuilder('content')
       .leftJoinAndSelect('content.folders', 'folders')
-      .where('content.userId = :userId', { userId })
+      .where('(content.userId = :userId OR folders.isPublic = :isPublic)', {
+        userId,
+        isPublic: true,
+      })
       .orderBy('content.createdAt', 'DESC')
       .addOrderBy('content.id', 'DESC')
       .limit(limit);
@@ -107,7 +110,7 @@ export class ContentService {
     updateContentDto: UpdateContentDto,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findById(id, userId);
+    const content = await this.findByIdAndUser(id, userId);
 
     Object.assign(content, updateContentDto);
     const updateContent = await this.contentRepository.save(content);
@@ -118,7 +121,20 @@ export class ContentService {
   }
 
   async findOne(id: string, userId: string): Promise<ContentDto> {
-    const content = await this.findById(id, userId, ['user', 'folders']);
+    const content = await this.contentRepository.findOne({
+      where: { id },
+      relations: ['user', 'folders'],
+    });
+
+    if (!content) {
+      throw new NotFoundException(`Content with ID ${id} not found`);
+    }
+
+    const isPublicFolder = content.folders.some((folder) => folder.isPublic);
+
+    if (content.userId !== userId && !isPublicFolder) {
+      throw new ForbiddenException('Access denied to this content');
+    }
 
     return plainToInstance(ContentDto, content, {
       excludeExtraneousValues: true,
@@ -126,7 +142,7 @@ export class ContentService {
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    const content = await this.findById(id, userId);
+    const content = await this.findByIdAndUser(id, userId);
 
     await this.contentRepository.remove(content);
   }
@@ -136,7 +152,7 @@ export class ContentService {
     addToFolderDto: AddToFolderDto,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findById(id, userId, ['folders']);
+    const content = await this.findByIdAndUser(id, userId, ['folders']);
 
     const folder = await this.folderService.findById(
       addToFolderDto.folderId,
@@ -159,7 +175,7 @@ export class ContentService {
     folderId: string,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findById(id, userId, ['folders']);
+    const content = await this.findByIdAndUser(id, userId, ['folders']);
 
     await this.folderService.findById(folderId, userId);
 
@@ -171,7 +187,7 @@ export class ContentService {
     });
   }
 
-  public async findById(
+  public async findByIdAndUser(
     id: string,
     userId: string,
     relations: string[] = ['user'],

@@ -21,7 +21,7 @@ export class SimilarContentService {
     userId: string,
     similarContents: SimilarContentCreateDto[],
   ): Promise<SimilarContentDto[]> {
-    const content: Content = await this.contentService.findById(
+    const content: Content = await this.contentService.findByIdAndUser(
       contentId,
       userId,
     );
@@ -41,7 +41,7 @@ export class SimilarContentService {
     contentId: string,
     userId: string,
   ): Promise<SimilarContentDto[]> {
-    const content: Content = await this.contentService.findById(
+    const content: Content = await this.contentService.findByIdAndUser(
       contentId,
       userId,
     );
