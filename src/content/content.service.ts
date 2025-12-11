@@ -54,13 +54,25 @@ export class ContentService {
     let queryBuilder = this.contentRepository
       .createQueryBuilder('content')
       .leftJoinAndSelect('content.folders', 'folders')
-      .where('(content.userId = :userId OR folders.isPublic = :isPublic)', {
-        userId,
-        isPublic: true,
-      })
       .orderBy('content.createdAt', 'DESC')
       .addOrderBy('content.id', 'DESC')
       .limit(limit);
+
+    if (folderId) {
+      queryBuilder = queryBuilder
+        .andWhere('folders.id = :folderId', { folderId })
+        .andWhere(
+          '(content.userId = :userId OR folders.isPublic = :isPublic)',
+          {
+            userId,
+            isPublic: true,
+          },
+        );
+    } else {
+      queryBuilder = queryBuilder.andWhere('(content.userId = :userId)', {
+        userId,
+      });
+    }
 
     if (search) {
       const searchTerm = search.toLowerCase();
@@ -81,13 +93,6 @@ export class ContentService {
       );
     }
 
-    if (folderId) {
-      queryBuilder = queryBuilder
-        .innerJoin('content.folders', 'filterFolders')
-        .andWhere('filterFolders.id = :folderId', {
-          folderId: filters.folderId,
-        });
-    }
     const items = await queryBuilder.getMany();
 
     let nextCursor: string | null = null;
