@@ -7,6 +7,7 @@ import { OembedService } from './services/oembed.service';
 import { OpenGraphService } from './services/opengraph.service';
 import { ImageDataService } from './services/image-data.service';
 import { StorageModule } from '../storage/store.module';
+import { IframelyService } from './services/iframely.service';
 
 @Module({
   imports: [ConfigModule, StorageModule],
@@ -16,6 +17,7 @@ import { StorageModule } from '../storage/store.module';
     OembedService,
     OpenGraphService,
     PreviewLinkService,
+    IframelyService,
   ],
   controllers: [PreviewLinkController],
   exports: [PreviewLinkService],

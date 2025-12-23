@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   ValidateNested,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ImageCreateDto } from './image-create.dto';
@@ -27,12 +28,15 @@ export class ContentCreateDto {
   url?: string;
 
   @ApiProperty({
-    description: 'Folder ID where content will be stored',
-    example: 'uuid-folder-id',
+    description: 'Folder IDs where content will be stored',
+    example: ['uuid-folder-id-1', 'uuid-folder-id-2'],
+    type: [String],
+    required: false,
   })
-  @IsString()
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  folderId?: string;
+  folderIds?: string[];
 
   @ApiProperty({
     description: '',

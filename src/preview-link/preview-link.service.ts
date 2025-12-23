@@ -3,6 +3,7 @@ import { LinkPreviewService } from './services/link-preview.service';
 import { OpenGraphService } from './services/opengraph.service';
 import { OembedService } from './services/oembed.service';
 import { ContentDto } from './dto/content.dto';
+import { IframelyService } from './services/iframely.service';
 
 @Injectable()
 export class PreviewLinkService {
@@ -10,23 +11,29 @@ export class PreviewLinkService {
     private readonly linkPreviewService: LinkPreviewService,
     private readonly opengraphService: OpenGraphService,
     private readonly oembedService: OembedService,
+    private readonly iframelyService: IframelyService,
   ) {}
   async getPreview(url: string): Promise<ContentDto> {
     this.validateUrl(url);
 
-    const oembedResult = await this.oembedService.getPreview(url);
-    if (oembedResult) {
-      return oembedResult;
-    }
+    // const oembedResult = await this.oembedService.getPreview(url);
+    // if (oembedResult) {
+    //   return oembedResult;
+    // }
+    //
+    // const opengraphResult = await this.opengraphService.getPreview(url);
+    // if (opengraphResult) {
+    //   return opengraphResult;
+    // }
+    //
+    // const linkPreviewResult = await this.linkPreviewService.getPreview(url);
+    // if (linkPreviewResult) {
+    //   return linkPreviewResult;
+    // }
 
-    const opengraphResult = await this.opengraphService.getPreview(url);
-    if (opengraphResult) {
-      return opengraphResult;
-    }
-
-    const linkPreviewResult = await this.linkPreviewService.getPreview(url);
-    if (linkPreviewResult) {
-      return linkPreviewResult;
+    const dto = await this.iframelyService.getPreview(url);
+    if (dto) {
+      return dto;
     }
 
     return this.createFallbackContent(url);

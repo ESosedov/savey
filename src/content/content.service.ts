@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Content } from './entities/content.entity';
 import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
@@ -15,12 +15,15 @@ import { AddToFolderDto } from './dto/add-to-folder.dto';
 import { FoldersService } from '../folders/folders.service';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { SimilarContent } from './entities/similar-content.entity';
+import { Folder } from '../folders/entities/folder.entity';
 
 @Injectable()
 export class ContentService {
   constructor(
     @InjectRepository(Content)
     private readonly contentRepository: Repository<Content>,
+    @InjectRepository(Folder)
+    private readonly folderRepository: Repository<Folder>,
     private readonly folderService: FoldersService,
     private readonly cursorService: CursorService,
     @InjectRepository(SimilarContent)
@@ -31,10 +34,29 @@ export class ContentService {
     createContentDto: ContentCreateDto,
     userId: string,
   ): Promise<ContentDto> {
+    const { folderIds, ...contentData } = createContentDto;
+
     const content = this.contentRepository.create({
-      ...createContentDto,
+      ...contentData,
       userId: userId,
     });
+
+    // Если указаны папки, загружаем их одним запросом
+    if (folderIds && folderIds.length > 0) {
+      const folders = await this.folderRepository.find({
+        where: {
+          id: In(folderIds),
+          userId: userId,
+        },
+      });
+
+      if (folders.length !== folderIds.length) {
+        throw new NotFoundException('Some folders not found or access denied');
+      }
+
+      content.folders = folders;
+    }
+
     const savedContent = await this.contentRepository.save(content);
 
     return plainToInstance(ContentDto, savedContent, {
@@ -117,9 +139,34 @@ export class ContentService {
     updateContentDto: UpdateContentDto,
     userId: string,
   ): Promise<ContentDto> {
-    const content = await this.findOwned(id, userId);
+    const content = await this.findOwned(id, userId, ['folders']);
 
-    Object.assign(content, updateContentDto);
+    const { folderIds, ...contentData } = updateContentDto;
+    Object.assign(content, contentData);
+
+    // Если указаны папки, обновляем связи одним запросом
+    if (folderIds !== undefined) {
+      if (folderIds.length > 0) {
+        const folders = await this.folderRepository.find({
+          where: {
+            id: In(folderIds),
+            userId: userId,
+          },
+        });
+
+        if (folders.length !== folderIds.length) {
+          throw new NotFoundException(
+            'Some folders not found or access denied',
+          );
+        }
+
+        content.folders = folders;
+      } else {
+        // Если пустой массив - удаляем все связи с папками
+        content.folders = [];
+      }
+    }
+
     const updateContent = await this.contentRepository.save(content);
 
     return plainToInstance(ContentDto, updateContent, {

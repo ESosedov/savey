@@ -7,9 +7,13 @@ import { CursorService } from './services/cursor.service';
 import { FoldersModule } from '../folders/folders.module';
 import { SimilarContentService } from './services/similar-content.service';
 import { SimilarContent } from './entities/similar-content.entity';
+import { Folder } from '../folders/entities/folder.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Content, SimilarContent]), FoldersModule],
+  imports: [
+    TypeOrmModule.forFeature([Content, SimilarContent, Folder]),
+    FoldersModule,
+  ],
   controllers: [ContentController],
   providers: [ContentService, CursorService, SimilarContentService],
   exports: [ContentService],
