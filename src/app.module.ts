@@ -11,6 +11,7 @@ import { OpenGraphModule } from './opengraph/opengraph.module';
 import { LinkPreviewModule } from './link-preview/link-preview.module';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { PreviewLinkModule } from './preview-link/preview-link.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { PreviewLinkModule } from './preview-link/preview-link.module';
     ContentModule,
     FoldersModule,
     LinkPreviewModule,
+    MailModule,
     OpenGraphModule,
     PreviewLinkModule,
     UsersModule,

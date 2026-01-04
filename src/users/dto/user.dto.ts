@@ -10,6 +10,10 @@ export class UserDto {
 
   @Expose()
   email?: string | null;
+
+  @Expose()
+  emailVerified: boolean;
+
   @Expose()
   createdAt: Date;
 

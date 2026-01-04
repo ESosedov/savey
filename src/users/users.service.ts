@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -8,6 +13,7 @@ import { Folder } from '../folders/entities/folder.entity';
 import * as bcrypt from 'bcrypt';
 import { UserDto } from './dto/user.dto';
 import { plainToInstance } from 'class-transformer';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class UsersService {
@@ -16,24 +22,75 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Folder)
     private readonly folderRepository: Repository<Folder>,
+    private readonly mailService: MailService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDto> {
+    const existingUser = await this.findByEmail(createUserDto.email);
+
+    if (existingUser) {
+      if (!existingUser.emailVerified) {
+        const verificationToken = this.generateVerificationToken();
+        const tokenExpiry = new Date();
+        tokenExpiry.setMinutes(tokenExpiry.getMinutes() + 3);
+
+        existingUser.emailVerificationToken = verificationToken;
+        existingUser.emailVerificationTokenExpiry = tokenExpiry;
+
+        if (createUserDto.password) {
+          const saltRounds = 10;
+          existingUser.passwordHash = await bcrypt.hash(
+            createUserDto.password,
+            saltRounds,
+          );
+        }
+
+        await this.userRepository.save(existingUser);
+
+        await this.mailService.sendVerificationEmail(
+          existingUser.email,
+          existingUser.firstName,
+          verificationToken,
+        );
+
+        return plainToInstance(UserDto, existingUser, {
+          excludeExtraneousValues: true,
+        });
+      }
+
+      throw new ConflictException('User with this email already exists');
+    }
+
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(createUserDto.password, saltRounds);
+
+    const verificationToken = this.generateVerificationToken();
+    const tokenExpiry = new Date();
+    tokenExpiry.setMinutes(tokenExpiry.getMinutes() + 3);
+
     const user = this.userRepository.create({
       ...createUserDto,
       passwordHash,
+      emailVerified: false,
+      emailVerificationToken: verificationToken,
+      emailVerificationTokenExpiry: tokenExpiry,
     });
+
     const savedUser = await this.userRepository.save(user);
 
     const favoriteFolder = this.folderRepository.create({
       title: 'Favorite',
       isPublic: false,
       userId: savedUser.id,
-      user: user,
+      user: savedUser,
     });
     await this.folderRepository.save(favoriteFolder);
+
+    await this.mailService.sendVerificationEmail(
+      savedUser.email,
+      savedUser.firstName,
+      verificationToken,
+    );
 
     return plainToInstance(UserDto, savedUser, {
       excludeExtraneousValues: true,
@@ -108,6 +165,13 @@ export class UsersService {
           picture: googleData.picture,
         });
         user.oauthProviders = oauthProviders;
+
+        if (!user.emailVerified) {
+          user.emailVerified = true;
+          user.emailVerificationToken = null;
+          user.emailVerificationTokenExpiry = null;
+        }
+
         user = await this.userRepository.save(user);
       }
     } else {
@@ -116,6 +180,9 @@ export class UsersService {
         firstName: googleData.firstName,
         lastName: googleData.lastName,
         passwordHash: '',
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiry: null,
         oauthProviders: [
           {
             provider: 'google',
@@ -138,5 +205,71 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async verifyEmail(email: string, code: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({
+      where: {
+        email,
+        emailVerificationToken: code,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Email already verified');
+    }
+
+    if (
+      !user.emailVerificationTokenExpiry ||
+      user.emailVerificationTokenExpiry < new Date()
+    ) {
+      throw new BadRequestException('Verification code has expired');
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationTokenExpiry = null;
+
+    await this.userRepository.save(user);
+
+    return { message: 'Email successfully verified' };
+  }
+
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const user = await this.findByEmail(email);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.emailVerified) {
+      throw new BadRequestException('Email already verified');
+    }
+
+    const verificationToken = this.generateVerificationToken();
+    const tokenExpiry = new Date();
+    tokenExpiry.setMinutes(tokenExpiry.getMinutes() + 3);
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationTokenExpiry = tokenExpiry;
+
+    await this.userRepository.save(user);
+
+    await this.mailService.sendVerificationEmail(
+      user.email,
+      user.firstName,
+      verificationToken,
+    );
+
+    return { message: 'Verification email sent' };
+  }
+
+  private generateVerificationToken(): string {
+    // Generate 6-digit code
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 }

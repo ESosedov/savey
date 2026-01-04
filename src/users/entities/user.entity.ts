@@ -32,6 +32,15 @@ export class User {
   @Column('varchar')
   passwordHash: string;
 
+  @Column('boolean', { default: false })
+  emailVerified: boolean;
+
+  @Column('varchar', { nullable: true })
+  emailVerificationToken: string | null;
+
+  @Column('timestamp', { nullable: true })
+  emailVerificationTokenExpiry: Date | null;
+
   @OneToMany(() => Folder, (folder) => folder.user)
   folders: Folder[];
 

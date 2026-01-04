@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 import { User } from '../users/entities/user.entity';
@@ -32,6 +36,10 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials');
+
+    if (!user.emailVerified) {
+      throw new ForbiddenException('Email not verified.');
+    }
 
     return this.generateToken(user);
   }
