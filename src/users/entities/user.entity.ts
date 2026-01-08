@@ -10,6 +10,7 @@ import {
 import { Folder } from '../../folders/entities/folder.entity';
 import { Content } from '../../content/entities/content.entity';
 import { OAuthProvider } from '../interfaces/oauth-provider.interface';
+import { RefreshToken } from '../../auth/entities/refresh-token.entity';
 
 @Entity('users')
 export class User {
@@ -46,6 +47,9 @@ export class User {
 
   @OneToMany(() => Content, (content) => content.user)
   content: Content[];
+
+  @OneToMany(() => RefreshToken, (refreshToken) => refreshToken.user)
+  refreshTokens: RefreshToken[];
 
   @Column('jsonb', { default: [] })
   oauthProviders: OAuthProvider[];

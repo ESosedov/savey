@@ -17,7 +17,14 @@ export class JwtStrategy extends PassportStrategy(JwtStrategyBase) {
     });
   }
 
-  async validate(payload: { sub: string }) {
+  async validate(payload: { sub: string; email: string; type?: string }) {
+    // Reject refresh tokens
+    if (payload.type === 'refresh') {
+      throw new UnauthorizedException(
+        'Cannot use refresh token as access token',
+      );
+    }
+
     const user = await this.usersService.findOne(payload.sub);
     if (!user) {
       throw new UnauthorizedException();
