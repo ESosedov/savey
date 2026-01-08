@@ -29,51 +29,16 @@ export class UsersService {
     const existingUser = await this.findByEmail(createUserDto.email);
 
     if (existingUser) {
-      if (!existingUser.emailVerified) {
-        const verificationToken = this.generateVerificationToken();
-        const tokenExpiry = new Date();
-        tokenExpiry.setMinutes(tokenExpiry.getMinutes() + 3);
-
-        existingUser.emailVerificationToken = verificationToken;
-        existingUser.emailVerificationTokenExpiry = tokenExpiry;
-
-        if (createUserDto.password) {
-          const saltRounds = 10;
-          existingUser.passwordHash = await bcrypt.hash(
-            createUserDto.password,
-            saltRounds,
-          );
-        }
-
-        await this.userRepository.save(existingUser);
-
-        await this.mailService.sendVerificationEmail(
-          existingUser.email,
-          existingUser.firstName,
-          verificationToken,
-        );
-
-        return plainToInstance(UserDto, existingUser, {
-          excludeExtraneousValues: true,
-        });
-      }
-
       throw new ConflictException('User with this email already exists');
     }
 
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(createUserDto.password, saltRounds);
 
-    const verificationToken = this.generateVerificationToken();
-    const tokenExpiry = new Date();
-    tokenExpiry.setMinutes(tokenExpiry.getMinutes() + 3);
-
     const user = this.userRepository.create({
       ...createUserDto,
       passwordHash,
       emailVerified: false,
-      emailVerificationToken: verificationToken,
-      emailVerificationTokenExpiry: tokenExpiry,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -85,12 +50,6 @@ export class UsersService {
       user: savedUser,
     });
     await this.folderRepository.save(favoriteFolder);
-
-    await this.mailService.sendVerificationEmail(
-      savedUser.email,
-      savedUser.firstName,
-      verificationToken,
-    );
 
     return plainToInstance(UserDto, savedUser, {
       excludeExtraneousValues: true,

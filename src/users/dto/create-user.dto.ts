@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -44,7 +45,7 @@ export class CreateUserDto {
     example: 'Doe',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MinLength(2)
   lastName: string;
 }

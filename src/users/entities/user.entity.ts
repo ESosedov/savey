@@ -23,7 +23,7 @@ export class User {
   @Column('varchar')
   firstName: string;
 
-  @Column('varchar')
+  @Column('varchar', { nullable: true })
   lastName: string;
 
   @Column('boolean', { default: true })
