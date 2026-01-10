@@ -14,6 +14,8 @@ import * as bcrypt from 'bcrypt';
 import { UserDto } from './dto/user.dto';
 import { plainToInstance } from 'class-transformer';
 import { MailService } from '../mail/mail.service';
+import { AuthResponseDto } from '../auth/dto/auth-response.dto';
+import { TokenService } from '../auth/token.service';
 
 @Injectable()
 export class UsersService {
@@ -23,6 +25,7 @@ export class UsersService {
     @InjectRepository(Folder)
     private readonly folderRepository: Repository<Folder>,
     private readonly mailService: MailService,
+    private readonly tokenService: TokenService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDto> {
@@ -166,7 +169,12 @@ export class UsersService {
     return user;
   }
 
-  async verifyEmail(email: string, code: string): Promise<{ message: string }> {
+  async verifyEmail(
+    email: string,
+    code: string,
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<AuthResponseDto> {
     const user = await this.userRepository.findOne({
       where: {
         email,
@@ -195,7 +203,7 @@ export class UsersService {
 
     await this.userRepository.save(user);
 
-    return { message: 'Email successfully verified' };
+    return this.tokenService.generateTokens(user, deviceInfo, ipAddress);
   }
 
   async resendVerificationEmail(email: string): Promise<{ message: string }> {

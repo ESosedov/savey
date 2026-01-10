@@ -5,12 +5,12 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
-import { User } from '../users/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 import { ConfigService } from '@nestjs/config';
 import { RefreshTokenService } from './refresh-token.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { TokenService } from './token.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +21,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly tokenService: TokenService,
   ) {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
     if (!clientId) {
@@ -46,7 +47,7 @@ export class AuthService {
       throw new ForbiddenException('Email not verified.');
     }
 
-    return this.generateTokens(user, deviceInfo, ipAddress);
+    return this.tokenService.generateTokens(user, deviceInfo, ipAddress);
   }
 
   async googleLogin(
@@ -78,32 +79,10 @@ export class AuthService {
       // Find or create user with verified data
       const user = await this.usersService.findOrCreateGoogleUser(googleData);
 
-      return this.generateTokens(user, deviceInfo, ipAddress);
+      return this.tokenService.generateTokens(user, deviceInfo, ipAddress);
     } catch (error) {
       throw new UnauthorizedException('Invalid Google token');
     }
-  }
-
-  private async generateTokens(
-    user: User,
-    deviceInfo?: string,
-    ipAddress?: string,
-  ): Promise<AuthResponseDto> {
-    // Generate access token
-    const payload = { sub: user.id, email: user.email };
-    const accessToken = this.jwtService.sign(payload);
-
-    // Generate refresh token
-    const refreshToken = await this.refreshTokenService.createRefreshToken(
-      user.id,
-      deviceInfo,
-      ipAddress,
-    );
-
-    return {
-      accessToken,
-      refreshToken,
-    };
   }
 
   async refreshTokens(

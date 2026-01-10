@@ -65,10 +65,16 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Email successfully verified' })
   @ApiResponse({ status: 400, description: 'Invalid or expired code' })
-  async verifyEmail(@Body(ValidationPipe) verifyEmailDto: VerifyEmailDto) {
+  async verifyEmail(
+    @Body(ValidationPipe) verifyEmailDto: VerifyEmailDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ) {
     return this.usersService.verifyEmail(
       verifyEmailDto.email,
       verifyEmailDto.code,
+      userAgent,
+      ip,
     );
   }
 
