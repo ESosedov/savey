@@ -12,6 +12,7 @@ import { LinkPreviewModule } from './link-preview/link-preview.module';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { PreviewLinkModule } from './preview-link/preview-link.module';
 import { MailModule } from './mail/mail.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MailModule } from './mail/mail.module';
     MailModule,
     OpenGraphModule,
     PreviewLinkModule,
+    TelegramModule,
     UsersModule,
   ],
   controllers: [AppController],

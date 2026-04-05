@@ -103,6 +103,67 @@ export class UsersService {
     return await this.userRepository.findOne({ where: { email } });
   }
 
+  async findByTelegramId(telegramId: number): Promise<User | null> {
+    return await this.userRepository.findOne({
+      where: { telegramId: String(telegramId) },
+    });
+  }
+
+  async linkTelegramId(userId: string, telegramId: number): Promise<void> {
+    await this.userRepository.update(userId, {
+      telegramId: String(telegramId),
+    });
+  }
+
+  async setVerificationCode(
+    userId: string,
+    code: string,
+    expiry: Date,
+  ): Promise<void> {
+    await this.userRepository.update(userId, {
+      emailVerificationToken: code,
+      emailVerificationTokenExpiry: expiry,
+    });
+  }
+
+  async findOrCreateByTelegramId(
+    telegramId: number,
+    firstName: string,
+  ): Promise<User> {
+    const existing = await this.findByTelegramId(telegramId);
+    if (existing) return existing;
+
+    const user = this.userRepository.create({
+      email: `telegram_${telegramId}@telegram.local`,
+      firstName,
+      passwordHash: '',
+      emailVerified: false,
+      telegramId: String(telegramId),
+    });
+    const savedUser = await this.userRepository.save(user);
+
+    const favoriteFolder = this.folderRepository.create({
+      title: 'Favorite',
+      isPublic: false,
+      userId: savedUser.id,
+      user: savedUser,
+    });
+    await this.folderRepository.save(favoriteFolder);
+
+    return savedUser;
+  }
+
+  async clearVerificationAndLink(
+    userId: string,
+    telegramId: number,
+  ): Promise<void> {
+    await this.userRepository.update(userId, {
+      emailVerificationToken: null,
+      emailVerificationTokenExpiry: null,
+      telegramId: String(telegramId),
+    });
+  }
+
   async findOrCreateGoogleUser(googleData: {
     email: string;
     firstName: string;

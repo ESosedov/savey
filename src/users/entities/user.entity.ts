@@ -51,6 +51,9 @@ export class User {
   @OneToMany(() => RefreshToken, (refreshToken) => refreshToken.user)
   refreshTokens: RefreshToken[];
 
+  @Column('bigint', { nullable: true, unique: true })
+  telegramId: string | null;
+
   @Column('jsonb', { default: [] })
   oauthProviders: OAuthProvider[];
 

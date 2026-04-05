@@ -38,9 +38,20 @@ export class IframelyService {
 
       let imageData: ImageData | null = null;
       if (imageLink && typeof imageLink?.href === 'string') {
-        imageData = await this.imageDataService.downloadAndStoreImage(
-          imageLink?.href,
-        );
+        try {
+          imageData = await this.imageDataService.downloadAndStoreImage(
+            imageLink.href,
+          );
+        } catch {
+          // Storage unavailable — use direct URL as fallback
+        }
+        if (!imageData) {
+          imageData = {
+            url: imageLink.href,
+            width: (imageLink.media?.width as number) ?? 0,
+            height: (imageLink.media?.height as number) ?? 0,
+          };
+        }
       }
 
       // Ищем favicon в links
