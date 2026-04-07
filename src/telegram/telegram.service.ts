@@ -6,6 +6,7 @@ import { MailService } from '../mail/mail.service';
 import { ContentService } from '../content/content.service';
 import { PreviewLinkService } from '../preview-link/preview-link.service';
 import { FoldersService } from '../folders/folders.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 import { ContentDto as SavedContentDto } from '../content/dto/content.dto';
 import { ContentDto as PreviewDto } from '../preview-link/dto/content.dto';
 import { FolderDto } from '../folders/dto/folder.dto';
@@ -14,12 +15,24 @@ import { CreateFolderDto } from '../folders/dto/create-folder.dto';
 type UserState =
   | { step: 'awaiting_email'; action: 'link' | 'register' }
   | { step: 'awaiting_code'; action: 'link' | 'register'; email: string }
-  | { step: 'awaiting_folder_name'; contentId?: string };
+  | { step: 'awaiting_folder_name'; contentId?: string }
+  | { step: 'awaiting_search_query' };
 
 interface PendingSearch {
   query: string;
   nextCursor: string;
 }
+
+const MAIN_KEYBOARD = {
+  keyboard: [
+    [{ text: '🔍 Поиск' }, { text: '📚 Все ссылки' }],
+    [{ text: '📁 Папки' }, { text: '⏱ Недавние' }],
+  ],
+  resize_keyboard: true,
+  persistent: true,
+};
+
+const MAIN_KEYBOARD_BUTTONS = new Set(['🔍 Поиск', '📚 Все ссылки', '📁 Папки', '⏱ Недавние']);
 
 const CONTENT_PAGE_SIZE = 5;
 
@@ -33,6 +46,7 @@ export class TelegramService {
   private readonly pendingFolderSelections = new Map<number, string>();
   private readonly pendingSearches = new Map<number, PendingSearch>();
   private readonly pendingListPagination = new Map<number, string>();
+  private readonly pendingFolderBrowse = new Map<number, { folderId: string; cursor?: string }>();
 
   constructor(
     private readonly usersService: UsersService,
@@ -40,6 +54,7 @@ export class TelegramService {
     private readonly contentService: ContentService,
     private readonly previewLinkService: PreviewLinkService,
     private readonly foldersService: FoldersService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   // ─── /start ──────────────────────────────────────────────────────────────
@@ -59,6 +74,7 @@ export class TelegramService {
       );
       await ctx.reply(
         `С возвращением, ${existingUser.firstName}! Кидай ссылку — я сохраню.`,
+        { reply_markup: MAIN_KEYBOARD },
       );
       return;
     }
@@ -123,6 +139,7 @@ export class TelegramService {
       `Отлично! Просто кинь мне ссылку — я создам аккаунт автоматически.\n\n` +
         `Если захочешь позже привязать email — используй /link.`,
     );
+    await ctx.reply('Выбирай действие:', { reply_markup: MAIN_KEYBOARD });
   }
 
   // ─── Входящий текст ───────────────────────────────────────────────────────
@@ -153,6 +170,22 @@ export class TelegramService {
           state.contentId,
         );
       }
+      if (state.step === 'awaiting_search_query') {
+        this.states.delete(telegramId);
+        return this.handleSearch(ctx, telegramId, text);
+      }
+    }
+
+    // Кнопки постоянной клавиатуры
+    if (MAIN_KEYBOARD_BUTTONS.has(text)) {
+      if (text === '🔍 Поиск') {
+        this.states.set(telegramId, { step: 'awaiting_search_query' });
+        await ctx.reply('Введи поисковый запрос:');
+        return;
+      }
+      if (text === '📚 Все ссылки') return this.handleAll(ctx);
+      if (text === '📁 Папки') return this.handleFoldersList(ctx);
+      if (text === '⏱ Недавние') return this.handleRecent(ctx);
     }
 
     if (this.isUrl(text)) {
@@ -286,21 +319,112 @@ export class TelegramService {
     }
 
     const folders = await this.foldersService.getList({}, user.id);
+    await this.sendFolderBrowsePage(ctx, folders, 0, 'reply');
+  }
 
-    if (folders.length === 0) {
-      await ctx.reply(
-        'У тебя пока нет папок.\n\nСоздай первую: /newfolder Название',
+  async handleBrowseFolderListPage(ctx: Context) {
+    await ctx.answerCbQuery();
+    const data = (ctx.callbackQuery as any).data as string;
+    const page = parseInt(data.replace('browse_folder_list:', ''), 10);
+    const telegramId = ctx.from?.id;
+    if (!telegramId) return;
+
+    const user = await this.usersService.findByTelegramId(telegramId);
+    if (!user) return;
+
+    const folders = await this.foldersService.getList({}, user.id);
+    await this.sendFolderBrowsePage(ctx, folders, page, 'edit');
+  }
+
+  async handleBrowseFolder(ctx: Context) {
+    await ctx.answerCbQuery();
+    const data = (ctx.callbackQuery as any).data as string;
+    const folderId = data.replace('browse_folder:', '');
+    const telegramId = ctx.from?.id;
+    if (!telegramId) return;
+
+    const user = await this.usersService.findByTelegramId(telegramId);
+    if (!user) return;
+
+    const folder = await this.foldersService.findById(folderId, user.id);
+    const result = await this.contentService.getContentWithPagination(user.id, {
+      folderId,
+      limit: CONTENT_PAGE_SIZE,
+    });
+
+    if (result.data.length === 0) {
+      await ctx.editMessageText(
+        `📁 <b>${this.escapeHtml(folder.title ?? 'Папка')}</b>\n\nПапка пуста.`,
+        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '← Назад', callback_data: 'browse_folder_list:0' }]] } },
       );
       return;
     }
 
-    const lines = folders.map(
-      (f, i) => `${i + 1}. ${f.title ?? 'Без названия'}`,
+    if (result.pagination.hasMore && result.pagination.nextCursor) {
+      this.pendingFolderBrowse.set(telegramId, { folderId, cursor: result.pagination.nextCursor });
+    } else {
+      this.pendingFolderBrowse.delete(telegramId);
+    }
+
+    const { text, keyboard } = this.formatContentList(
+      result.data,
+      `📁 <b>${this.escapeHtml(folder.title ?? 'Папка')}</b>:`,
+      result.pagination.hasMore,
+      { more: 'browse_folder_more', back: 'browse_folder_list:0' },
     );
-    await ctx.reply(
-      `📁 <b>Мои папки:</b>\n\n${lines.join('\n')}\n\n/newfolder &lt;название&gt; — создать новую`,
-      { parse_mode: 'HTML' },
+    await ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard,
+      link_preview_options: { is_disabled: true },
+    });
+  }
+
+  async handleBrowseFolderMore(ctx: Context) {
+    await ctx.answerCbQuery();
+    const telegramId = ctx.from?.id;
+    if (!telegramId) return;
+
+    const pending = this.pendingFolderBrowse.get(telegramId);
+    if (!pending?.cursor) {
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+      return;
+    }
+
+    const user = await this.usersService.findByTelegramId(telegramId);
+    if (!user) return;
+
+    const folder = await this.foldersService.findById(pending.folderId, user.id);
+    const result = await this.contentService.getContentWithPagination(user.id, {
+      folderId: pending.folderId,
+      limit: CONTENT_PAGE_SIZE,
+      cursor: pending.cursor,
+    });
+
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+
+    if (result.data.length === 0) {
+      this.pendingFolderBrowse.delete(telegramId);
+      await ctx.reply('Больше нет.');
+      return;
+    }
+
+    if (result.pagination.hasMore && result.pagination.nextCursor) {
+      this.pendingFolderBrowse.set(telegramId, { folderId: pending.folderId, cursor: result.pagination.nextCursor });
+    } else {
+      this.pendingFolderBrowse.delete(telegramId);
+    }
+
+    const { text, keyboard } = this.formatContentList(
+      result.data,
+      `📁 <b>${this.escapeHtml(folder.title ?? 'Папка')}</b> (продолжение):`,
+      result.pagination.hasMore,
+      { more: 'browse_folder_more' },
     );
+    await ctx.reply(text, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard,
+      link_preview_options: { is_disabled: true },
+    });
   }
 
   async handleNewFolderCommand(ctx: Context) {
@@ -511,6 +635,44 @@ export class TelegramService {
     }
 
     this.logger.log(`search userId=${user.id} query="${query}"`);
+
+    // Пробуем семантический поиск
+    let semanticResults: SavedContentDto[] | null = null;
+    try {
+      const embedding = await this.embeddingService.generateForQuery(query);
+      semanticResults = await this.contentService.semanticSearch(
+        user.id,
+        embedding,
+        SEARCH_PAGE_SIZE,
+      );
+    } catch (err) {
+      this.logger.warn(`semantic search failed, fallback to text: ${err}`);
+    }
+
+    if (semanticResults !== null) {
+      if (semanticResults.length === 0) {
+        await ctx.reply(
+          `Ничего не нашлось по запросу «<b>${this.escapeHtml(query)}</b>».`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      this.pendingSearches.delete(telegramId);
+      const { text, keyboard } = this.formatSearchResults(
+        semanticResults,
+        false,
+        query,
+      );
+      await ctx.reply(text, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+        link_preview_options: { is_disabled: true },
+      });
+      return;
+    }
+
+    // Fallback — текстовый поиск
     const result = await this.contentService.getContentWithPagination(user.id, {
       search: query,
       limit: SEARCH_PAGE_SIZE,
@@ -648,6 +810,13 @@ export class TelegramService {
     this.logger.log(`url saved contentId=${saved.id} userId=${user.id}`);
     await ctx.deleteMessage(loadingMsg.message_id);
     await this.sendContentCard(ctx, saved);
+
+    this.generateAndStoreEmbedding(
+      saved.id,
+      saved.title ?? url,
+      saved.description,
+      saved.siteName,
+    ).catch(() => {});
   }
 
   private async sendContentCard(ctx: Context, content: SavedContentDto) {
@@ -701,6 +870,7 @@ export class TelegramService {
     items: SavedContentDto[],
     header: string,
     hasMore = false,
+    callbacks: { more?: string; back?: string } = { more: 'all_more' },
   ): { text: string; keyboard: InlineKeyboardMarkup } {
     const lines = items.map((item, i) => {
       const title = this.truncate(item.title ?? 'Без названия', 80);
@@ -716,9 +886,10 @@ export class TelegramService {
     const text = [header, ...lines].join('\n\n');
 
     const rows: InlineKeyboardMarkup['inline_keyboard'] = [];
-    if (hasMore) {
-      rows.push([{ text: '→ Ещё', callback_data: 'all_more' }]);
-    }
+    const navRow: { text: string; callback_data: string }[] = [];
+    if (callbacks.back) navRow.push({ text: '← Назад', callback_data: callbacks.back });
+    if (hasMore && callbacks.more) navRow.push({ text: '→ Ещё', callback_data: callbacks.more });
+    if (navRow.length) rows.push(navRow);
 
     return { text, keyboard: { inline_keyboard: rows } };
   }
@@ -752,6 +923,49 @@ export class TelegramService {
     }
 
     return { text, keyboard: { inline_keyboard: rows } };
+  }
+
+  private async sendFolderBrowsePage(
+    ctx: Context,
+    folders: FolderDto[],
+    page: number,
+    mode: 'reply' | 'edit',
+  ) {
+    const start = page * FOLDERS_PAGE_SIZE;
+    const pageFolders = folders.slice(start, start + FOLDERS_PAGE_SIZE);
+
+    if (pageFolders.length === 0 && page === 0) {
+      const text = 'У тебя пока нет папок. Создай первую:';
+      const keyboard = {
+        inline_keyboard: [[{ text: '➕ Новая папка', callback_data: 'folder_new' }]],
+      };
+      if (mode === 'edit') {
+        await ctx.editMessageText(text, { reply_markup: keyboard });
+      } else {
+        await ctx.reply(text, { reply_markup: keyboard });
+      }
+      return;
+    }
+
+    const folderButtons = pageFolders.map((f) => [
+      { text: f.title ?? 'Без названия', callback_data: `browse_folder:${f.id}` },
+    ]);
+
+    const nav: { text: string; callback_data: string }[] = [];
+    if (page > 0) nav.push({ text: '← Назад', callback_data: `browse_folder_list:${page - 1}` });
+    if (start + FOLDERS_PAGE_SIZE < folders.length) nav.push({ text: 'Вперёд →', callback_data: `browse_folder_list:${page + 1}` });
+
+    const rows = [...folderButtons];
+    if (nav.length) rows.push(nav);
+
+    const keyboard = { inline_keyboard: rows };
+    const text = '📁 Выбери папку:';
+
+    if (mode === 'edit') {
+      await ctx.editMessageText(text, { reply_markup: keyboard });
+    } else {
+      await ctx.reply(text, { reply_markup: keyboard });
+    }
   }
 
   private async sendFolderPage(
@@ -810,7 +1024,13 @@ export class TelegramService {
     const text = '📁 Выбери папку:';
 
     if (mode === 'edit') {
-      await ctx.editMessageText(text, { reply_markup: keyboard });
+      const msg = ctx.callbackQuery?.message;
+      const hasMedia = msg && ('photo' in msg || 'document' in msg || 'video' in msg || 'sticker' in msg || 'animation' in msg);
+      if (hasMedia) {
+        await ctx.editMessageCaption(text, { reply_markup: keyboard });
+      } else {
+        await ctx.editMessageText(text, { reply_markup: keyboard });
+      }
     } else {
       await ctx.reply(text, { reply_markup: keyboard });
     }
@@ -960,7 +1180,27 @@ export class TelegramService {
     await ctx.reply(
       `Готово! Аккаунт привязан, ${user.firstName}. ` +
         `Теперь кидай ссылку — я её сохраню.`,
+      { reply_markup: MAIN_KEYBOARD },
     );
+  }
+
+  private async generateAndStoreEmbedding(
+    contentId: string,
+    title: string,
+    description?: string | null,
+    siteName?: string | null,
+  ): Promise<void> {
+    try {
+      const embedding = await this.embeddingService.generateForContent(
+        title,
+        description,
+        siteName,
+      );
+      await this.contentService.updateEmbedding(contentId, embedding);
+      this.logger.log(`embedding saved for contentId=${contentId}`);
+    } catch (err) {
+      this.logger.warn(`failed to generate embedding for ${contentId}: ${err}`);
+    }
   }
 
   private isUrl(text: string): boolean {

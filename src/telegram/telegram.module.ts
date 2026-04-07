@@ -9,6 +9,7 @@ import { MailModule } from '../mail/mail.module';
 import { ContentModule } from '../content/content.module';
 import { PreviewLinkModule } from '../preview-link/preview-link.module';
 import { FoldersModule } from '../folders/folders.module';
+import { EmbeddingModule } from '../embedding/embedding.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { FoldersModule } from '../folders/folders.module';
     ContentModule,
     PreviewLinkModule,
     FoldersModule,
+    EmbeddingModule,
   ],
   controllers: [TelegramController],
   providers: [TelegramUpdate, TelegramService],

@@ -23,6 +23,7 @@
     "migration:generate": "npx typeorm-ts-node-commonjs migration:generate src/migrations/Migration$(date +%Y%m%d%H%M%S) -d datasource.config.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",

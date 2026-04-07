@@ -165,6 +165,27 @@ export class TelegramUpdate implements OnApplicationBootstrap {
     );
   }
 
+  @Action(/^browse_folder_list:/)
+  async onBrowseFolderListPage(@Ctx() ctx: Context) {
+    await this.safeHandle(ctx, 'action:browse_folder_list', () =>
+      this.telegramService.handleBrowseFolderListPage(ctx),
+    );
+  }
+
+  @Action(/^browse_folder:/)
+  async onBrowseFolder(@Ctx() ctx: Context) {
+    await this.safeHandle(ctx, 'action:browse_folder', () =>
+      this.telegramService.handleBrowseFolder(ctx),
+    );
+  }
+
+  @Action('browse_folder_more')
+  async onBrowseFolderMore(@Ctx() ctx: Context) {
+    await this.safeHandle(ctx, 'action:browse_folder_more', () =>
+      this.telegramService.handleBrowseFolderMore(ctx),
+    );
+  }
+
   @Action(/^delete_content:/)
   async onDeleteContent(@Ctx() ctx: Context) {
     await this.safeHandle(ctx, 'action:delete_content', () =>

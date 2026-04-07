@@ -3,8 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Content } from './entities/content.entity';
 import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
@@ -28,6 +28,8 @@ export class ContentService {
     private readonly cursorService: CursorService,
     @InjectRepository(SimilarContent)
     private readonly similarContentRepository: Repository<SimilarContent>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(
@@ -233,6 +235,38 @@ export class ContentService {
     return plainToInstance(ContentDto, content, {
       excludeExtraneousValues: true,
     });
+  }
+
+  async updateEmbedding(id: string, embedding: number[]): Promise<void> {
+    const vectorStr = `[${embedding.join(',')}]`;
+    await this.dataSource.query(
+      `UPDATE content SET embedding = $1::vector WHERE id = $2`,
+      [vectorStr, id],
+    );
+  }
+
+  async semanticSearch(
+    userId: string,
+    embedding: number[],
+    limit: number,
+  ): Promise<ContentDto[]> {
+    const vectorStr = `[${embedding.join(',')}]`;
+    const rows = await this.dataSource.query(
+      `SELECT id, title, url, domain, description, type, favicon,
+              site_name AS "siteName",
+              image,
+              created_at AS "createdAt",
+              updated_at AS "updatedAt",
+              user_id AS "userId"
+       FROM content
+       WHERE user_id = $2 AND embedding IS NOT NULL
+       ORDER BY embedding <=> $1::vector
+       LIMIT $3`,
+      [vectorStr, userId, limit],
+    );
+    return plainToInstance(ContentDto, rows as object[], {
+      excludeExtraneousValues: true,
+    }) as ContentDto[];
   }
 
   public async findOwned(
