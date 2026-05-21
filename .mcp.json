@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "postgresql": {
+      "type": "stdio",
+      "command": "sh",
+      "args": [
+        "-c",
+        "npx -y @modelcontextprotocol/server-postgres \"$SAVEY_DATABASE_URL?sslmode=require\""
+      ],
+      "env": {}
+    }
+  }
+}
