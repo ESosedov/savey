@@ -32,7 +32,12 @@ const MAIN_KEYBOARD = {
   persistent: true,
 };
 
-const MAIN_KEYBOARD_BUTTONS = new Set(['🔍 Поиск', '📚 Все ссылки', '📁 Папки', '⏱ Недавние']);
+const MAIN_KEYBOARD_BUTTONS = new Set([
+  '🔍 Поиск',
+  '📚 Все ссылки',
+  '📁 Папки',
+  '⏱ Недавние',
+]);
 
 const CONTENT_PAGE_SIZE = 5;
 
@@ -46,7 +51,10 @@ export class TelegramService {
   private readonly pendingFolderSelections = new Map<number, string>();
   private readonly pendingSearches = new Map<number, PendingSearch>();
   private readonly pendingListPagination = new Map<number, string>();
-  private readonly pendingFolderBrowse = new Map<number, { folderId: string; cursor?: string }>();
+  private readonly pendingFolderBrowse = new Map<
+    number,
+    { folderId: string; cursor?: string }
+  >();
 
   constructor(
     private readonly usersService: UsersService,
@@ -355,13 +363,23 @@ export class TelegramService {
     if (result.data.length === 0) {
       await ctx.editMessageText(
         `📁 <b>${this.escapeHtml(folder.title ?? 'Папка')}</b>\n\nПапка пуста.`,
-        { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '← Назад', callback_data: 'browse_folder_list:0' }]] } },
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '← Назад', callback_data: 'browse_folder_list:0' }],
+            ],
+          },
+        },
       );
       return;
     }
 
     if (result.pagination.hasMore && result.pagination.nextCursor) {
-      this.pendingFolderBrowse.set(telegramId, { folderId, cursor: result.pagination.nextCursor });
+      this.pendingFolderBrowse.set(telegramId, {
+        folderId,
+        cursor: result.pagination.nextCursor,
+      });
     } else {
       this.pendingFolderBrowse.delete(telegramId);
     }
@@ -393,7 +411,10 @@ export class TelegramService {
     const user = await this.usersService.findByTelegramId(telegramId);
     if (!user) return;
 
-    const folder = await this.foldersService.findById(pending.folderId, user.id);
+    const folder = await this.foldersService.findById(
+      pending.folderId,
+      user.id,
+    );
     const result = await this.contentService.getContentWithPagination(user.id, {
       folderId: pending.folderId,
       limit: CONTENT_PAGE_SIZE,
@@ -409,7 +430,10 @@ export class TelegramService {
     }
 
     if (result.pagination.hasMore && result.pagination.nextCursor) {
-      this.pendingFolderBrowse.set(telegramId, { folderId: pending.folderId, cursor: result.pagination.nextCursor });
+      this.pendingFolderBrowse.set(telegramId, {
+        folderId: pending.folderId,
+        cursor: result.pagination.nextCursor,
+      });
     } else {
       this.pendingFolderBrowse.delete(telegramId);
     }
@@ -811,12 +835,13 @@ export class TelegramService {
     await ctx.deleteMessage(loadingMsg.message_id);
     await this.sendContentCard(ctx, saved);
 
-    this.generateAndStoreEmbedding(
-      saved.id,
-      saved.title ?? url,
-      saved.description,
-      saved.siteName,
-    ).catch(() => {});
+    if (saved.title && saved.title !== url) {
+      this.generateAndStoreEmbedding(
+        saved.id,
+        saved.title,
+        saved.description,
+      ).catch(() => {});
+    }
   }
 
   private async sendContentCard(ctx: Context, content: SavedContentDto) {
@@ -887,8 +912,10 @@ export class TelegramService {
 
     const rows: InlineKeyboardMarkup['inline_keyboard'] = [];
     const navRow: { text: string; callback_data: string }[] = [];
-    if (callbacks.back) navRow.push({ text: '← Назад', callback_data: callbacks.back });
-    if (hasMore && callbacks.more) navRow.push({ text: '→ Ещё', callback_data: callbacks.more });
+    if (callbacks.back)
+      navRow.push({ text: '← Назад', callback_data: callbacks.back });
+    if (hasMore && callbacks.more)
+      navRow.push({ text: '→ Ещё', callback_data: callbacks.more });
     if (navRow.length) rows.push(navRow);
 
     return { text, keyboard: { inline_keyboard: rows } };
@@ -937,7 +964,9 @@ export class TelegramService {
     if (pageFolders.length === 0 && page === 0) {
       const text = 'У тебя пока нет папок. Создай первую:';
       const keyboard = {
-        inline_keyboard: [[{ text: '➕ Новая папка', callback_data: 'folder_new' }]],
+        inline_keyboard: [
+          [{ text: '➕ Новая папка', callback_data: 'folder_new' }],
+        ],
       };
       if (mode === 'edit') {
         await ctx.editMessageText(text, { reply_markup: keyboard });
@@ -948,12 +977,23 @@ export class TelegramService {
     }
 
     const folderButtons = pageFolders.map((f) => [
-      { text: f.title ?? 'Без названия', callback_data: `browse_folder:${f.id}` },
+      {
+        text: f.title ?? 'Без названия',
+        callback_data: `browse_folder:${f.id}`,
+      },
     ]);
 
     const nav: { text: string; callback_data: string }[] = [];
-    if (page > 0) nav.push({ text: '← Назад', callback_data: `browse_folder_list:${page - 1}` });
-    if (start + FOLDERS_PAGE_SIZE < folders.length) nav.push({ text: 'Вперёд →', callback_data: `browse_folder_list:${page + 1}` });
+    if (page > 0)
+      nav.push({
+        text: '← Назад',
+        callback_data: `browse_folder_list:${page - 1}`,
+      });
+    if (start + FOLDERS_PAGE_SIZE < folders.length)
+      nav.push({
+        text: 'Вперёд →',
+        callback_data: `browse_folder_list:${page + 1}`,
+      });
 
     const rows = [...folderButtons];
     if (nav.length) rows.push(nav);
@@ -1025,7 +1065,13 @@ export class TelegramService {
 
     if (mode === 'edit') {
       const msg = ctx.callbackQuery?.message;
-      const hasMedia = msg && ('photo' in msg || 'document' in msg || 'video' in msg || 'sticker' in msg || 'animation' in msg);
+      const hasMedia =
+        msg &&
+        ('photo' in msg ||
+          'document' in msg ||
+          'video' in msg ||
+          'sticker' in msg ||
+          'animation' in msg);
       if (hasMedia) {
         await ctx.editMessageCaption(text, { reply_markup: keyboard });
       } else {
@@ -1188,13 +1234,11 @@ export class TelegramService {
     contentId: string,
     title: string,
     description?: string | null,
-    siteName?: string | null,
   ): Promise<void> {
     try {
       const embedding = await this.embeddingService.generateForContent(
         title,
         description,
-        siteName,
       );
       await this.contentService.updateEmbedding(contentId, embedding);
       this.logger.log(`embedding saved for contentId=${contentId}`);

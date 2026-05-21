@@ -257,16 +257,17 @@ export class ContentService {
               image,
               created_at AS "createdAt",
               updated_at AS "updatedAt",
-              user_id AS "userId"
+              user_id AS "userId",
        FROM content
        WHERE user_id = $2 AND embedding IS NOT NULL
+         AND embedding <=> $1::vector < 0.35
        ORDER BY embedding <=> $1::vector
        LIMIT $3`,
       [vectorStr, userId, limit],
     );
     return plainToInstance(ContentDto, rows as object[], {
       excludeExtraneousValues: true,
-    }) as ContentDto[];
+    });
   }
 
   public async findOwned(
