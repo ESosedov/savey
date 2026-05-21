@@ -673,15 +673,7 @@ export class TelegramService {
       this.logger.warn(`semantic search failed, fallback to text: ${err}`);
     }
 
-    if (semanticResults !== null) {
-      if (semanticResults.length === 0) {
-        await ctx.reply(
-          `Ничего не нашлось по запросу «<b>${this.escapeHtml(query)}</b>».`,
-          { parse_mode: 'HTML' },
-        );
-        return;
-      }
-
+    if (semanticResults !== null && semanticResults.length > 0) {
       this.pendingSearches.delete(telegramId);
       const { text, keyboard } = this.formatSearchResults(
         semanticResults,
