@@ -46,6 +46,18 @@ export class ContentDto {
   @Expose()
   type?: string | null;
 
+  @Expose()
+  contentType?: string | null;
+
+  @Exclude()
+  fileKey?: string | null;
+
+  @Expose()
+  fileSize?: number | null;
+
+  @Expose()
+  mimeType?: string | null;
+
   @Expose({ name: 'createdAt' })
   savedAt: Date;
 

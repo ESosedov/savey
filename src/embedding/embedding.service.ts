@@ -19,10 +19,30 @@ export class EmbeddingService {
     description?: string | null,
   ): Promise<number[]> {
     const text = description
-      ? `title: ${title} | text: ${description}`
-      : `title: ${title}`;
+      ? `task: search result | document: ${title} | text: ${description}`
+      : `task: search result | document: ${title}`;
 
     return this.embed(text);
+  }
+
+  async generateFromImage(
+    imageBuffer: Buffer,
+    mimeType: string,
+  ): Promise<number[]> {
+    const model = this.genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
+
+    const result = await model.embedContent({
+      content: {
+        role: 'user',
+        parts: [
+          { text: 'task: search result | document:' },
+          { inlineData: { mimeType, data: imageBuffer.toString('base64') } },
+        ],
+      },
+      outputDimensionality: EMBEDDING_DIMS,
+    } as any);
+
+    return result.embedding.values;
   }
 
   async generateForQuery(query: string): Promise<number[]> {

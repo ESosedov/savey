@@ -29,6 +29,9 @@ import { UpdateContentDto } from './dto/update-content.dto';
 import { SimilarContentService } from './services/similar-content.service';
 import { SimilarContentCreateDto } from './dto/similar-content/similar-content-create.dto';
 import { SimilarContentDto } from './dto/similar-content/similar-content.dto';
+import { ContentType } from './entities/content.entity';
+
+const LINK_ONLY = [ContentType.LINK];
 
 @ApiTags('content')
 @ApiBearerAuth()
@@ -52,8 +55,10 @@ export class ContentController {
     @Body(ValidationPipe)
     createContentDto: ContentCreateDto,
   ): Promise<ContentDto> {
-    // TODO: Add validation for folder ownership
-    return this.contentService.create(createContentDto, user.id);
+    return this.contentService.create(
+      { ...createContentDto, contentType: ContentType.LINK },
+      user.id,
+    );
   }
 
   @Post('list')
@@ -65,7 +70,11 @@ export class ContentController {
     data: ContentDto[];
     pagination: { nextCursor: string | null; hasMore: boolean };
   }> {
-    return await this.contentService.getContentWithPagination(user.id, filters);
+    return this.contentService.getContentWithPagination(
+      user.id,
+      filters,
+      LINK_ONLY,
+    );
   }
 
   @Get(':id')
@@ -80,7 +89,7 @@ export class ContentController {
     @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ContentDto> {
-    return this.contentService.getOne(id, user.id);
+    return this.contentService.getOne(id, user.id, LINK_ONLY);
   }
 
   @Patch(':id')
@@ -96,7 +105,7 @@ export class ContentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updateContentDto: UpdateContentDto,
   ): Promise<ContentDto> {
-    return this.contentService.update(id, updateContentDto, user.id);
+    return this.contentService.update(id, updateContentDto, user.id, LINK_ONLY);
   }
 
   @Delete(':id')
@@ -104,7 +113,7 @@ export class ContentController {
   @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
   @ApiResponse({ status: 200, description: 'Content successfully deleted.' })
   async remove(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.remove(id, user.id);
+    return this.contentService.remove(id, user.id, LINK_ONLY);
   }
 
   @Put(':id/folder')
@@ -121,7 +130,12 @@ export class ContentController {
     @Body(ValidationPipe)
     addToFolderDto: AddToFolderDto,
   ): Promise<ContentDto> {
-    return this.contentService.addToFolder(id, addToFolderDto, user.id);
+    return this.contentService.addToFolder(
+      id,
+      addToFolderDto,
+      user.id,
+      LINK_ONLY,
+    );
   }
 
   @Delete(':id/folder/:folderId')
@@ -138,7 +152,12 @@ export class ContentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('folderId', ParseUUIDPipe) folderId: string,
   ): Promise<ContentDto> {
-    return this.contentService.removeFromFolder(id, folderId, user.id);
+    return this.contentService.removeFromFolder(
+      id,
+      folderId,
+      user.id,
+      LINK_ONLY,
+    );
   }
 
   @Post(':id/similar/add')

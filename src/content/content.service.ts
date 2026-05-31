@@ -1,11 +1,12 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
-import { Content } from './entities/content.entity';
+import { Content, ContentType } from './entities/content.entity';
 import { ContentCreateDto } from './dto/content-create.dto';
 import { ContentFilterDto } from './dto/content-filter.dto';
 import { CursorService } from './services/cursor.service';
@@ -16,9 +17,13 @@ import { FoldersService } from '../folders/folders.service';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { SimilarContent } from './entities/similar-content.entity';
 import { Folder } from '../folders/entities/folder.entity';
+import { StorageService } from '../storage/storage.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class ContentService {
+  private readonly logger = new Logger(ContentService.name);
+
   constructor(
     @InjectRepository(Content)
     private readonly contentRepository: Repository<Content>,
@@ -30,6 +35,8 @@ export class ContentService {
     private readonly similarContentRepository: Repository<SimilarContent>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly storageService: StorageService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(
@@ -69,6 +76,7 @@ export class ContentService {
   async getContentWithPagination(
     userId: string,
     filters: ContentFilterDto,
+    contentTypes?: string[],
   ): Promise<{
     data: ContentDto[];
     pagination: { nextCursor: string | null; hasMore: boolean };
@@ -81,6 +89,13 @@ export class ContentService {
       .orderBy('content.createdAt', 'DESC')
       .addOrderBy('content.id', 'DESC')
       .limit(limit);
+
+    if (contentTypes && contentTypes.length > 0) {
+      queryBuilder = queryBuilder.andWhere(
+        'content.contentType IN (:...contentTypes)',
+        { contentTypes },
+      );
+    }
 
     if (folderId) {
       queryBuilder = queryBuilder
@@ -140,8 +155,14 @@ export class ContentService {
     id: string,
     updateContentDto: UpdateContentDto,
     userId: string,
+    allowedContentTypes?: string[],
   ): Promise<ContentDto> {
-    const content = await this.findOwned(id, userId, ['folders']);
+    const content = await this.findOwned(
+      id,
+      userId,
+      ['folders'],
+      allowedContentTypes,
+    );
 
     const { folderIds, ...contentData } = updateContentDto;
     Object.assign(content, contentData);
@@ -176,8 +197,16 @@ export class ContentService {
     });
   }
 
-  async getOne(id: string, userId: string): Promise<ContentDto> {
-    const content = await this.findPublicOrOwned(id, userId);
+  async getOne(
+    id: string,
+    userId: string,
+    allowedContentTypes?: string[],
+  ): Promise<ContentDto> {
+    const content = await this.findPublicOrOwned(
+      id,
+      userId,
+      allowedContentTypes,
+    );
     const similar = await this.similarContentRepository.find({
       where: { content: { id: content.id } },
     });
@@ -191,18 +220,45 @@ export class ContentService {
     );
   }
 
-  async remove(id: string, userId: string): Promise<void> {
-    const content = await this.findOwned(id, userId);
+  async remove(
+    id: string,
+    userId: string,
+    allowedContentTypes?: string[],
+  ): Promise<void> {
+    const content = await this.findOwned(
+      id,
+      userId,
+      ['user'],
+      allowedContentTypes,
+    );
 
     await this.contentRepository.remove(content);
+
+    if (content.fileKey && content.fileSize) {
+      try {
+        await this.storageService.deleteFile(content.fileKey);
+        await this.usersService.decrementStorageUsed(
+          userId,
+          Number(content.fileSize),
+        );
+      } catch (err) {
+        this.logger.warn(`failed to delete file ${content.fileKey}: ${err}`);
+      }
+    }
   }
 
   async addToFolder(
     id: string,
     addToFolderDto: AddToFolderDto,
     userId: string,
+    allowedContentTypes?: string[],
   ): Promise<ContentDto> {
-    const content = await this.findOwned(id, userId, ['folders']);
+    const content = await this.findOwned(
+      id,
+      userId,
+      ['folders'],
+      allowedContentTypes,
+    );
 
     const folder = await this.folderService.findById(
       addToFolderDto.folderId,
@@ -224,8 +280,14 @@ export class ContentService {
     id: string,
     folderId: string,
     userId: string,
+    allowedContentTypes?: string[],
   ): Promise<ContentDto> {
-    const content = await this.findOwned(id, userId, ['folders']);
+    const content = await this.findOwned(
+      id,
+      userId,
+      ['folders'],
+      allowedContentTypes,
+    );
 
     await this.folderService.findById(folderId, userId);
 
@@ -255,6 +317,8 @@ export class ContentService {
       `SELECT id, title, url, domain, description, type, favicon,
               site_name AS "siteName",
               image,
+              content_type AS "contentType",
+              mime_type AS "mimeType",
               created_at AS "createdAt",
               updated_at AS "updatedAt",
               user_id AS "userId"
@@ -274,6 +338,7 @@ export class ContentService {
     id: string,
     userId: string,
     relations: string[] = ['user'],
+    allowedContentTypes?: string[],
   ): Promise<Content> {
     const content = await this.contentRepository.findOne({
       where: { id },
@@ -288,10 +353,22 @@ export class ContentService {
       throw new ForbiddenException('Access denied to this content');
     }
 
+    if (
+      allowedContentTypes &&
+      allowedContentTypes.length > 0 &&
+      !allowedContentTypes.includes(content.contentType ?? ContentType.LINK)
+    ) {
+      throw new NotFoundException(`Content with ID ${id} not found`);
+    }
+
     return content;
   }
 
-  async findPublicOrOwned(id: string, userId: string): Promise<Content> {
+  async findPublicOrOwned(
+    id: string,
+    userId: string,
+    allowedContentTypes?: string[],
+  ): Promise<Content> {
     const content = await this.contentRepository.findOne({
       where: { id },
       relations: ['user', 'folders'],
@@ -305,6 +382,14 @@ export class ContentService {
 
     if (content.userId !== userId && !isPublicFolder) {
       throw new ForbiddenException('Access denied to this content');
+    }
+
+    if (
+      allowedContentTypes &&
+      allowedContentTypes.length > 0 &&
+      !allowedContentTypes.includes(content.contentType ?? ContentType.LINK)
+    ) {
+      throw new NotFoundException(`Content with ID ${id} not found`);
     }
 
     return content;

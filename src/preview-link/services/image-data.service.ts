@@ -43,7 +43,10 @@ export class ImageDataService {
     }
 
     const { id, width, height } = await this.saveImage(image);
-    const newUrl = `https://${this.publicDomain}/images/${id}.webp`;
+    const baseUrl = this.publicDomain.startsWith('http')
+      ? this.publicDomain
+      : `https://${this.publicDomain}`;
+    const newUrl = `${baseUrl}/images/${id}.webp`;
 
     return {
       width,

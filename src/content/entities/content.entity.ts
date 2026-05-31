@@ -14,6 +14,12 @@ import { User } from '../../users/entities/user.entity';
 import { Folder } from '../../folders/entities/folder.entity';
 import { ImageData } from '../interfaces/image-data.interface';
 
+export enum ContentType {
+  LINK = 'link',
+  PHOTO = 'photo',
+  DOCUMENT = 'document',
+}
+
 @Entity('content')
 export class Content {
   @PrimaryColumn('uuid')
@@ -58,6 +64,18 @@ export class Content {
 
   @Column('varchar', { nullable: true })
   type: string | null;
+
+  @Column('varchar', { nullable: true, default: ContentType.LINK })
+  contentType: string | null;
+
+  @Column('varchar', { nullable: true })
+  fileKey: string | null;
+
+  @Column('bigint', { nullable: true })
+  fileSize: number | null;
+
+  @Column('varchar', { nullable: true })
+  mimeType: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

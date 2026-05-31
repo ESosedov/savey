@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TelegrafModule } from 'nestjs-telegraf';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TelegramUpdate } from './telegram.update';
 import { TelegramService } from './telegram.service';
 import { TelegramController } from './telegram.controller';
@@ -10,6 +10,7 @@ import { ContentModule } from '../content/content.module';
 import { PreviewLinkModule } from '../preview-link/preview-link.module';
 import { FoldersModule } from '../folders/folders.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
+import { StorageModule } from '../storage/store.module';
 
 @Module({
   imports: [
@@ -21,12 +22,14 @@ import { EmbeddingModule } from '../embedding/embedding.module';
       }),
       inject: [ConfigService],
     }),
+    ConfigModule,
     UsersModule,
     MailModule,
     ContentModule,
     PreviewLinkModule,
     FoldersModule,
     EmbeddingModule,
+    StorageModule,
   ],
   controllers: [TelegramController],
   providers: [TelegramUpdate, TelegramService],

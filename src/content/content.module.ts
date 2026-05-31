@@ -8,11 +8,15 @@ import { FoldersModule } from '../folders/folders.module';
 import { SimilarContentService } from './services/similar-content.service';
 import { SimilarContent } from './entities/similar-content.entity';
 import { Folder } from '../folders/entities/folder.entity';
+import { StorageModule } from '../storage/store.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Content, SimilarContent, Folder]),
     FoldersModule,
+    StorageModule,
+    UsersModule,
   ],
   controllers: [ContentController],
   providers: [ContentService, CursorService, SimilarContentService],

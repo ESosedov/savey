@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Context } from 'telegraf';
 import type { InlineKeyboardMarkup } from '@telegraf/types';
 import { UsersService } from '../users/users.service';
@@ -7,6 +8,11 @@ import { ContentService } from '../content/content.service';
 import { PreviewLinkService } from '../preview-link/preview-link.service';
 import { FoldersService } from '../folders/folders.service';
 import { EmbeddingService } from '../embedding/embedding.service';
+import {
+  StorageService,
+  STORAGE_LIMIT_BYTES,
+} from '../storage/storage.service';
+import { ContentType } from '../content/entities/content.entity';
 import { ContentDto as SavedContentDto } from '../content/dto/content.dto';
 import { ContentDto as PreviewDto } from '../preview-link/dto/content.dto';
 import { FolderDto } from '../folders/dto/folder.dto';
@@ -63,6 +69,8 @@ export class TelegramService {
     private readonly previewLinkService: PreviewLinkService,
     private readonly foldersService: FoldersService,
     private readonly embeddingService: EmbeddingService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   // ─── /start ──────────────────────────────────────────────────────────────
@@ -180,6 +188,9 @@ export class TelegramService {
       }
       if (state.step === 'awaiting_search_query') {
         this.states.delete(telegramId);
+        if (this.isUrl(text)) {
+          return this.handleUrl(ctx, telegramId, text);
+        }
         return this.handleSearch(ctx, telegramId, text);
       }
     }
@@ -675,16 +686,7 @@ export class TelegramService {
 
     if (semanticResults !== null && semanticResults.length > 0) {
       this.pendingSearches.delete(telegramId);
-      const { text, keyboard } = this.formatSearchResults(
-        semanticResults,
-        false,
-        query,
-      );
-      await ctx.reply(text, {
-        parse_mode: 'HTML',
-        reply_markup: keyboard,
-        link_preview_options: { is_disabled: true },
-      });
+      await this.sendSearchResults(ctx, semanticResults, false, query);
       return;
     }
 
@@ -711,16 +713,12 @@ export class TelegramService {
       this.pendingSearches.delete(telegramId);
     }
 
-    const { text, keyboard } = this.formatSearchResults(
+    await this.sendSearchResults(
+      ctx,
       result.data,
       result.pagination.hasMore,
       query,
     );
-    await ctx.reply(text, {
-      parse_mode: 'HTML',
-      reply_markup: keyboard,
-      link_preview_options: { is_disabled: true },
-    });
   }
 
   async handleSearchMore(ctx: Context) {
@@ -761,17 +759,13 @@ export class TelegramService {
       this.pendingSearches.delete(telegramId);
     }
 
-    const { text, keyboard } = this.formatSearchResults(
+    await this.sendSearchResults(
+      ctx,
       result.data,
       result.pagination.hasMore,
       pending.query,
       true,
     );
-    await ctx.reply(text, {
-      parse_mode: 'HTML',
-      reply_markup: keyboard,
-      link_preview_options: { is_disabled: true },
-    });
   }
 
   // ─── Приватные методы ─────────────────────────────────────────────────────
@@ -833,6 +827,185 @@ export class TelegramService {
         saved.title,
         saved.description,
       ).catch(() => {});
+    }
+  }
+
+  // ─── Фото ─────────────────────────────────────────────────────────────────
+
+  async handlePhoto(ctx: Context) {
+    const telegramId = ctx.from?.id;
+    if (!telegramId || !('photo' in ctx.message!)) return;
+
+    this.states.delete(telegramId);
+
+    const user = await this.usersService.findOrCreateByTelegramId(
+      telegramId,
+      ctx.from!.first_name,
+    );
+
+    const photos = ctx.message.photo;
+    const photo = photos[photos.length - 1];
+    const fileSize = photo.file_size ?? 0;
+
+    if (Number(user.storageUsed) + fileSize > STORAGE_LIMIT_BYTES) {
+      await ctx.reply(
+        'Превышен лимит хранилища (250 MB). Удали старые файлы, чтобы освободить место.',
+      );
+      return;
+    }
+
+    const loadingMsg = await ctx.reply('Сохраняю фото...');
+
+    let fileKey: string | undefined;
+    let thumbnailKey: string | undefined;
+    try {
+      const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+      const response = await fetch(fileLink.href);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const actualSize = buffer.length;
+
+      const { key: uploadedKey } = await this.storageService.uploadFile(
+        buffer,
+        'image/jpeg',
+        'photos',
+      );
+      fileKey = uploadedKey;
+
+      const thumbnail = await this.storageService.uploadImage(buffer);
+      thumbnailKey = `${thumbnail.id}.webp`;
+
+      const rawDomain = this.configService.get<string>('PUBLIC_DOMAIN') ?? '';
+      const baseUrl = rawDomain.startsWith('http')
+        ? rawDomain
+        : `https://${rawDomain}`;
+      const caption = ctx.message.caption ?? '';
+
+      const saved = await this.contentService.create(
+        {
+          title: caption || `Фото ${new Date().toLocaleDateString('ru')}`,
+          description: caption || undefined,
+          contentType: ContentType.PHOTO,
+          fileKey,
+          fileSize: actualSize,
+          mimeType: 'image/jpeg',
+          image: {
+            url: `${baseUrl}/images/${thumbnail.id}.webp`,
+            width: thumbnail.width,
+            height: thumbnail.height,
+          },
+        },
+        user.id,
+      );
+
+      await this.usersService.incrementStorageUsed(user.id, actualSize);
+      await ctx.deleteMessage(loadingMsg.message_id);
+      await this.sendContentCard(ctx, saved);
+
+      this.generateImageEmbedding(saved.id, buffer, 'image/jpeg').catch(
+        () => {},
+      );
+    } catch (err) {
+      if (fileKey)
+        await this.storageService.deleteFile(fileKey).catch(() => {});
+      if (thumbnailKey)
+        await this.storageService.deleteFile(thumbnailKey).catch(() => {});
+      this.logger.error(`handlePhoto error userId=${user.id}`, err);
+      await ctx.deleteMessage(loadingMsg.message_id);
+      await ctx.reply('Не удалось сохранить фото. Попробуй ещё раз.');
+    }
+  }
+
+  // ─── Документы ────────────────────────────────────────────────────────────
+
+  async handleDocument(ctx: Context) {
+    const telegramId = ctx.from?.id;
+    if (!telegramId || !('document' in ctx.message!)) return;
+
+    this.states.delete(telegramId);
+
+    const user = await this.usersService.findOrCreateByTelegramId(
+      telegramId,
+      ctx.from!.first_name,
+    );
+
+    const doc = ctx.message.document;
+    const fileSize = doc.file_size ?? 0;
+    const mimeType = doc.mime_type ?? 'application/octet-stream';
+    const fileName = doc.file_name ?? 'Документ';
+
+    if (fileSize > 20 * 1024 * 1024) {
+      await ctx.reply('Файл слишком большой. Максимальный размер — 20 MB.');
+      return;
+    }
+
+    if (Number(user.storageUsed) + fileSize > STORAGE_LIMIT_BYTES) {
+      await ctx.reply(
+        'Превышен лимит хранилища (250 MB). Удали старые файлы, чтобы освободить место.',
+      );
+      return;
+    }
+
+    const loadingMsg = await ctx.reply(`Сохраняю ${fileName}...`);
+
+    let fileKey: string | undefined;
+    try {
+      const fileLink = await ctx.telegram.getFileLink(doc.file_id);
+      const response = await fetch(fileLink.href);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const actualSize = buffer.length;
+
+      const { key: uploadedKey } = await this.storageService.uploadFile(
+        buffer,
+        mimeType,
+        'documents',
+      );
+      fileKey = uploadedKey;
+
+      const caption = ctx.message.caption ?? '';
+
+      const saved = await this.contentService.create(
+        {
+          title: caption || fileName,
+          description: caption || undefined,
+          contentType: ContentType.DOCUMENT,
+          fileKey,
+          fileSize: actualSize,
+          mimeType,
+        },
+        user.id,
+      );
+
+      await this.usersService.incrementStorageUsed(user.id, actualSize);
+      await ctx.deleteMessage(loadingMsg.message_id);
+      await this.sendContentCard(ctx, saved);
+
+      const embeddingText = [fileName, caption].filter(Boolean).join('\n');
+      this.generateAndStoreEmbedding(saved.id, embeddingText).catch(() => {});
+    } catch (err) {
+      if (fileKey)
+        await this.storageService.deleteFile(fileKey).catch(() => {});
+      this.logger.error(`handleDocument error userId=${user.id}`, err);
+      await ctx.deleteMessage(loadingMsg.message_id);
+      await ctx.reply('Не удалось сохранить документ. Попробуй ещё раз.');
+    }
+  }
+
+  private async generateImageEmbedding(
+    contentId: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<void> {
+    try {
+      const embedding = await this.embeddingService.generateFromImage(
+        buffer,
+        mimeType,
+      );
+      await this.contentService.updateEmbedding(contentId, embedding);
+      this.logger.log(`image embedding saved for contentId=${contentId}`);
+    } catch (err) {
+      this.logger.warn(
+        `failed to generate image embedding for ${contentId}: ${err}`,
+      );
     }
   }
 
@@ -913,35 +1086,65 @@ export class TelegramService {
     return { text, keyboard: { inline_keyboard: rows } };
   }
 
-  private formatSearchResults(
+  private async sendSearchResults(
+    ctx: Context,
     items: SavedContentDto[],
     hasMore: boolean,
     query: string,
     isContinuation = false,
-  ): { text: string; keyboard: InlineKeyboardMarkup } {
+  ): Promise<void> {
     const header = isContinuation
       ? `🔎 Ещё по «<b>${this.escapeHtml(query)}</b>»:`
       : `🔎 По «<b>${this.escapeHtml(query)}</b>»:`;
 
-    const lines = items.map((item, i) => {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const isLast = i === items.length - 1;
+      const isFirst = i === 0;
+
       const title = this.truncate(item.title ?? 'Без названия', 80);
-      const titlePart = item.url
-        ? `<a href="${item.url}">${this.escapeHtml(title)}</a>`
-        : `<b>${this.escapeHtml(title)}</b>`;
-      const description = item.description
-        ? `\n   ${this.truncate(this.escapeHtml(item.description), 120)}`
-        : '';
-      return `${i + 1}. ${titlePart}${description}`;
-    });
+      let titleLine: string;
+      if (item.contentType === ContentType.PHOTO) {
+        titleLine = `🖼 <b>${this.escapeHtml(title)}</b>`;
+      } else if (item.contentType === ContentType.DOCUMENT) {
+        titleLine = `📄 <b>${this.escapeHtml(title)}</b>`;
+      } else {
+        titleLine = item.url
+          ? `<a href="${item.url}">${this.escapeHtml(title)}</a>`
+          : `<b>${this.escapeHtml(title)}</b>`;
+        if (item.domain) titleLine += `\n🌐 ${this.escapeHtml(item.domain)}`;
+      }
 
-    const text = [header, ...lines].join('\n\n');
+      const prefix = isFirst ? `${header}\n\n${i + 1}. ` : `${i + 1}. `;
+      const caption = `${prefix}${titleLine}`;
 
-    const rows: InlineKeyboardMarkup['inline_keyboard'] = [];
-    if (hasMore) {
-      rows.push([{ text: '→ Ещё результаты', callback_data: 'search_more' }]);
+      const keyboard: InlineKeyboardMarkup = {
+        inline_keyboard:
+          isLast && hasMore
+            ? [[{ text: '→ Ещё результаты', callback_data: 'search_more' }]]
+            : [],
+      };
+
+      const imageUrl = item.image?.url;
+      if (imageUrl) {
+        try {
+          await ctx.replyWithPhoto(imageUrl, {
+            caption,
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+          });
+          continue;
+        } catch {
+          // fallback to text if photo send fails
+        }
+      }
+
+      await ctx.reply(caption, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+        link_preview_options: { is_disabled: true },
+      });
     }
-
-    return { text, keyboard: { inline_keyboard: rows } };
   }
 
   private async sendFolderBrowsePage(

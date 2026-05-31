@@ -164,6 +164,24 @@ export class UsersService {
     });
   }
 
+  async incrementStorageUsed(userId: string, bytes: number): Promise<void> {
+    await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({ storageUsed: () => `"storage_used" + ${bytes}` })
+      .where('id = :userId', { userId })
+      .execute();
+  }
+
+  async decrementStorageUsed(userId: string, bytes: number): Promise<void> {
+    await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({ storageUsed: () => `GREATEST("storage_used" - ${bytes}, 0)` })
+      .where('id = :userId', { userId })
+      .execute();
+  }
+
   async findOrCreateGoogleUser(googleData: {
     email: string;
     firstName: string;

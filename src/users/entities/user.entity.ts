@@ -54,6 +54,9 @@ export class User {
   @Column('bigint', { nullable: true, unique: true })
   telegramId: string | null;
 
+  @Column('bigint', { default: 0 })
+  storageUsed: number;
+
   @Column('jsonb', { default: [] })
   oauthProviders: OAuthProvider[];
 

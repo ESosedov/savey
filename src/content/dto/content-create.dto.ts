@@ -92,4 +92,9 @@ export class ContentCreateDto {
   @IsString()
   @IsOptional()
   siteName?: string;
+
+  contentType?: string;
+  fileKey?: string;
+  fileSize?: number;
+  mimeType?: string;
 }

@@ -193,6 +193,20 @@ export class TelegramUpdate implements OnApplicationBootstrap {
     );
   }
 
+  @On('photo')
+  async onPhoto(@Ctx() ctx: Context) {
+    await this.safeHandle(ctx, 'photo', () =>
+      this.telegramService.handlePhoto(ctx),
+    );
+  }
+
+  @On('document')
+  async onDocument(@Ctx() ctx: Context) {
+    await this.safeHandle(ctx, 'document', () =>
+      this.telegramService.handleDocument(ctx),
+    );
+  }
+
   @On('text')
   async onText(@Ctx() ctx: Context) {
     await this.safeHandle(ctx, 'text', () =>
