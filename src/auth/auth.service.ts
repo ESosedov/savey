@@ -11,6 +11,11 @@ import { ConfigService } from '@nestjs/config';
 import { RefreshTokenService } from './refresh-token.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { TokenService } from './token.service';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
+import { TelegramLoginDto } from './dto/telegram-login.dto';
+
+/** How old a Telegram widget login may be before it is refused. */
+const TELEGRAM_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 @Injectable()
 export class AuthService {
@@ -91,6 +96,52 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Invalid Google token');
     }
+  }
+
+  /**
+   * Telegram Login Widget. The widget hands the browser a payload signed with
+   * HMAC-SHA256, keyed by SHA256(bot token); verifying it proves the payload came
+   * from Telegram for this bot. Docs: https://core.telegram.org/widgets/login
+   */
+  async telegramLogin(
+    data: TelegramLoginDto,
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<AuthResponseDto> {
+    const botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+    if (!botToken) {
+      throw new UnauthorizedException('Telegram login is not configured');
+    }
+
+    const { hash, ...fields } = data;
+    const checkString = Object.entries(fields)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `${key}=${value}`)
+      .sort()
+      .join('\n');
+    const secret = createHash('sha256').update(botToken).digest();
+    const expected = createHmac('sha256', secret).update(checkString).digest();
+    const received = Buffer.from(hash, 'hex');
+    if (
+      received.length !== expected.length ||
+      !timingSafeEqual(received, expected)
+    ) {
+      throw new UnauthorizedException('Invalid Telegram login');
+    }
+
+    const age = Math.floor(Date.now() / 1000) - data.auth_date;
+    if (age > TELEGRAM_AUTH_MAX_AGE_SECONDS) {
+      throw new UnauthorizedException('Telegram login has expired');
+    }
+
+    const user = await this.usersService.findOrCreateTelegramUser({
+      telegramId: data.id,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      picture: data.photo_url,
+    });
+
+    return this.tokenService.generateTokens(user, deviceInfo, ipAddress);
   }
 
   async refreshTokens(

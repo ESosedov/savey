@@ -153,6 +153,39 @@ export class UsersService {
     return savedUser;
   }
 
+  /**
+   * Web login with Telegram. Reuses the account the bot created or linked for this
+   * Telegram id, so the same library shows up on the web. Keeps the Telegram photo
+   * in `oauthProviders` (the web app reads avatars from there).
+   */
+  async findOrCreateTelegramUser(data: {
+    telegramId: number;
+    firstName: string;
+    lastName?: string;
+    picture?: string;
+  }): Promise<User> {
+    let user = await this.findByTelegramId(data.telegramId);
+    if (!user) {
+      user = await this.findOrCreateByTelegramId(
+        data.telegramId,
+        data.firstName,
+      );
+      if (data.lastName) user.lastName = data.lastName;
+    }
+
+    const providers = (user.oauthProviders ?? []).filter(
+      (p) => p.provider !== 'telegram',
+    );
+    providers.push({
+      provider: 'telegram',
+      providerId: String(data.telegramId),
+      picture: data.picture,
+    });
+    user.oauthProviders = providers;
+
+    return this.userRepository.save(user);
+  }
+
   async clearVerificationAndLink(
     userId: string,
     telegramId: number,

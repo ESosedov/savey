@@ -11,6 +11,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { GetUser } from './decorators/user.decorator';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GoogleLoginDto } from './dto/google-login.dto';
+import { TelegramLoginDto } from './dto/telegram-login.dto';
 import { UsersService } from '../users/users.service';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
@@ -54,6 +55,23 @@ export class AuthController {
     @Headers('user-agent') userAgent: string,
   ): Promise<AuthResponseDto> {
     return this.authService.googleLogin(idToken, userAgent, ip);
+  }
+
+  @Public()
+  @Post('telegram')
+  @ApiOperation({
+    summary: 'Telegram Login',
+    description:
+      'Login with the signed payload from the Telegram Login Widget. Finds the user linked to this Telegram account (also the one the bot created) or creates one.',
+  })
+  @ApiResponse({ status: 200, type: AuthResponseDto })
+  @ApiResponse({ status: 401, description: 'Invalid or expired payload' })
+  async telegramLogin(
+    @Body() body: TelegramLoginDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent: string,
+  ): Promise<AuthResponseDto> {
+    return this.authService.telegramLogin(body, userAgent, ip);
   }
 
   @Public()
