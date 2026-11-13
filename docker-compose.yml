@@ -86,7 +86,7 @@ services:
 
   # PostgreSQL Database
   postgres:
-    image: pgvector/pgvector:pg15
+    image: pgvector/pgvector:0.8.6-pg15
     container_name: savey-postgres
     restart: unless-stopped
     environment:

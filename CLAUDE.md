@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Stack
 
-NestJS 11 + TypeORM 0.3.26 + PostgreSQL (Neon cloud) + MinIO + Telegram bot + Gemini AI embeddings.
+NestJS 11 + TypeORM 0.3.26 + PostgreSQL (Neon for dev, Docker for prod) + MinIO + Telegram bot + Gemini AI embeddings.
 
 ## Commands
 
@@ -21,7 +21,8 @@ npm run migration:generate # generate migration from entity diff
 
 ## Database
 
-- Dev and prod both use **Neon PostgreSQL** (cloud) — no local Docker DB needed.
+- Dev uses **Neon PostgreSQL** (cloud) — no local Docker DB needed.
+- Prod uses Postgres in the `savey-postgres` Docker container on the server (`ssh oracle-vm`).
 - `synchronize: false` — never use `synchronize: true`, always use migrations.
 - `SnakeNamingStrategy` converts all camelCase entity fields to `snake_case` columns automatically.
 - Migrations live in `src/migrations/` — run via `typeorm-ts-node-commonjs` pointing at `datasource.config.ts`.
@@ -62,4 +63,4 @@ docker compose pull
 docker compose up -d
 ```
 
-The Docker entrypoint runs `npm run migration:run` before starting the app. All services (nginx, api, minio, iframely) are defined in `docker-compose.yml`.
+The Docker entrypoint runs `npm run migration:run` before starting the app. All services (nginx, nestjs-api, postgres, minio, iframely) are defined in `docker-compose.yml`.
