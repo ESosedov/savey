@@ -37,7 +37,6 @@ import { SimilarContentDto } from './dto/similar-content/similar-content.dto';
 import { ContentType } from './entities/content.entity';
 import { SearchContentDto } from './dto/search-content.dto';
 
-const LINK_ONLY = [ContentType.LINK];
 const LINK_AND_PHOTO = [ContentType.LINK, ContentType.PHOTO];
 
 @ApiTags('content')
@@ -150,7 +149,7 @@ export class ContentController {
     @GetUser() user: User,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ContentDto> {
-    return this.contentService.getOne(id, user.id, LINK_ONLY);
+    return this.contentService.getOne(id, user.id, LINK_AND_PHOTO);
   }
 
   @Patch(':id')
@@ -166,7 +165,12 @@ export class ContentController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updateContentDto: UpdateContentDto,
   ): Promise<ContentDto> {
-    return this.contentService.update(id, updateContentDto, user.id, LINK_ONLY);
+    return this.contentService.update(
+      id,
+      updateContentDto,
+      user.id,
+      LINK_AND_PHOTO,
+    );
   }
 
   @Delete(':id')
@@ -174,7 +178,7 @@ export class ContentController {
   @ApiParam({ name: 'id', description: 'Content ID', type: 'string' })
   @ApiResponse({ status: 200, description: 'Content successfully deleted.' })
   async remove(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
-    return this.contentService.remove(id, user.id, LINK_ONLY);
+    return this.contentService.remove(id, user.id, LINK_AND_PHOTO);
   }
 
   @Put(':id/folder')
@@ -195,7 +199,7 @@ export class ContentController {
       id,
       addToFolderDto,
       user.id,
-      LINK_ONLY,
+      LINK_AND_PHOTO,
     );
   }
 
@@ -217,7 +221,7 @@ export class ContentController {
       id,
       folderId,
       user.id,
-      LINK_ONLY,
+      LINK_AND_PHOTO,
     );
   }
 
