@@ -15,6 +15,7 @@ import { TokenService } from './token.service';
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client;
+  private googleAudiences: string[];
 
   constructor(
     private readonly usersService: UsersService,
@@ -23,11 +24,18 @@ export class AuthService {
     private readonly refreshTokenService: RefreshTokenService,
     private readonly tokenService: TokenService,
   ) {
-    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    if (!clientId) {
+    const androidClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    const webClientId = this.configService.get<string>('GOOGLE_CLIENT_ID_WEB');
+    if (!androidClientId) {
       throw new Error('GOOGLE_CLIENT_ID is not configured');
     }
-    this.googleClient = new OAuth2Client(clientId);
+    // Android app and web frontend are registered as separate OAuth clients
+    // (different application types in Google Cloud Console), so ID tokens can
+    // carry either audience — accept both.
+    this.googleAudiences = [androidClientId, webClientId].filter(
+      (id): id is string => !!id,
+    );
+    this.googleClient = new OAuth2Client(androidClientId);
   }
 
   async login(
@@ -59,7 +67,7 @@ export class AuthService {
       // Verify the ID token with Google
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
-        audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+        audience: this.googleAudiences,
       });
 
       const payload = ticket.getPayload();
