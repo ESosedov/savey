@@ -166,7 +166,7 @@ export class ContentService {
       .leftJoinAndSelect('content.folders', 'folders')
       .orderBy('content.createdAt', 'DESC')
       .addOrderBy('content.id', 'DESC')
-      .limit(limit);
+      .take(limit);
 
     if (contentTypes && contentTypes.length > 0) {
       queryBuilder = queryBuilder.andWhere(
@@ -405,7 +405,7 @@ export class ContentService {
         search: `%${searchTerm}%`,
       })
       .orderBy('content.createdAt', 'DESC')
-      .limit(limit);
+      .take(limit);
 
     if (contentTypes && contentTypes.length > 0) {
       qb = qb.andWhere('content.contentType IN (:...contentTypes)', {
