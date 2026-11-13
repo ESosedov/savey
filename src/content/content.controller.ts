@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -9,13 +10,17 @@ import {
   ParseUUIDPipe,
   Put,
   Patch,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiConsumes,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { GetUser } from '../auth/decorators/user.decorator';
@@ -30,8 +35,10 @@ import { SimilarContentService } from './services/similar-content.service';
 import { SimilarContentCreateDto } from './dto/similar-content/similar-content-create.dto';
 import { SimilarContentDto } from './dto/similar-content/similar-content.dto';
 import { ContentType } from './entities/content.entity';
+import { SearchContentDto } from './dto/search-content.dto';
 
 const LINK_ONLY = [ContentType.LINK];
+const LINK_AND_PHOTO = [ContentType.LINK, ContentType.PHOTO];
 
 @ApiTags('content')
 @ApiBearerAuth()
@@ -61,6 +68,60 @@ export class ContentController {
     );
   }
 
+  @Post('search')
+  @ApiOperation({ summary: 'Semantic search with text fallback' })
+  @ApiBody({ type: SearchContentDto })
+  @ApiResponse({ status: 200, type: [ContentDto] })
+  async search(
+    @GetUser() user: User,
+    @Body(ValidationPipe) dto: SearchContentDto,
+  ): Promise<ContentDto[]> {
+    return this.contentService.search(
+      user.id,
+      dto.query,
+      dto.limit ?? 20,
+      LINK_AND_PHOTO,
+    );
+  }
+
+  @Post('photo')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }),
+  )
+  @ApiOperation({ summary: 'Upload photo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({ status: 201, type: ContentDto })
+  async uploadPhoto(
+    @GetUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('title') title?: string,
+    @Body('description') description?: string,
+  ): Promise<ContentDto> {
+    if (!file) throw new BadRequestException('File is required');
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException('Only image files are allowed');
+    }
+    return this.contentService.createPhoto(
+      user.id,
+      file.buffer,
+      file.mimetype,
+      title,
+      description,
+    );
+  }
+
   @Post('list')
   @ApiBody({ type: ContentFilterDto })
   async getContent(
@@ -73,7 +134,7 @@ export class ContentController {
     return this.contentService.getContentWithPagination(
       user.id,
       filters,
-      LINK_ONLY,
+      LINK_AND_PHOTO,
     );
   }
 

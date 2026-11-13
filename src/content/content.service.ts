@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -17,8 +18,13 @@ import { FoldersService } from '../folders/folders.service';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { SimilarContent } from './entities/similar-content.entity';
 import { Folder } from '../folders/entities/folder.entity';
-import { StorageService } from '../storage/storage.service';
+import {
+  StorageService,
+  STORAGE_LIMIT_BYTES,
+} from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
+import { EmbeddingService } from '../embedding/embedding.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ContentService {
@@ -37,6 +43,8 @@ export class ContentService {
     private readonly dataSource: DataSource,
     private readonly storageService: StorageService,
     private readonly usersService: UsersService,
+    private readonly embeddingService: EmbeddingService,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(
@@ -68,9 +76,79 @@ export class ContentService {
 
     const savedContent = await this.contentRepository.save(content);
 
+    if (savedContent.title && savedContent.contentType !== ContentType.PHOTO) {
+      this.generateAndStoreEmbedding(
+        savedContent.id,
+        savedContent.title,
+        savedContent.description,
+      ).catch(() => {});
+    }
+
     return plainToInstance(ContentDto, savedContent, {
       excludeExtraneousValues: true,
     });
+  }
+
+  async createPhoto(
+    userId: string,
+    buffer: Buffer,
+    mimeType: string,
+    title?: string,
+    description?: string,
+  ): Promise<ContentDto> {
+    const user = await this.usersService.findOne(userId);
+    if (Number(user.storageUsed) + buffer.length > STORAGE_LIMIT_BYTES) {
+      throw new PayloadTooLargeException('Storage limit exceeded');
+    }
+
+    const rawDomain = this.configService.get<string>('PUBLIC_DOMAIN') ?? '';
+    const baseUrl = rawDomain.startsWith('http')
+      ? rawDomain
+      : `https://${rawDomain}`;
+
+    let fileKey: string | undefined;
+    let thumbnailKey: string | undefined;
+    try {
+      const [{ key: uploadedKey }, thumbnail] = await Promise.all([
+        this.storageService.uploadFile(buffer, mimeType, 'photos'),
+        this.storageService.uploadImage(buffer),
+      ]);
+      fileKey = uploadedKey;
+      thumbnailKey = `${thumbnail.id}.webp`;
+
+      const savedContent = await this.create(
+        {
+          title: title || `Фото ${new Date().toLocaleDateString('ru')}`,
+          description: description || undefined,
+          contentType: ContentType.PHOTO,
+          fileKey,
+          fileSize: buffer.length,
+          mimeType,
+          image: {
+            url: `${baseUrl}/images/${thumbnail.id}.webp`,
+            width: thumbnail.width,
+            height: thumbnail.height,
+          },
+        },
+        userId,
+      );
+
+      await this.usersService.incrementStorageUsed(userId, buffer.length);
+
+      this.generateAndStoreImageEmbedding(
+        savedContent.id,
+        buffer,
+        mimeType,
+      ).catch(() => {});
+
+      return savedContent;
+    } catch (err) {
+      if (fileKey)
+        await this.storageService.deleteFile(fileKey).catch(() => {});
+      if (thumbnailKey)
+        await this.storageService.deleteFile(thumbnailKey).catch(() => {});
+      throw err;
+    }
   }
 
   async getContentWithPagination(
@@ -299,6 +377,48 @@ export class ContentService {
     });
   }
 
+  async search(
+    userId: string,
+    query: string,
+    limit: number,
+    contentTypes?: string[],
+  ): Promise<ContentDto[]> {
+    try {
+      const embedding = await this.embeddingService.generateForQuery(query);
+      const results = await this.semanticSearch(
+        userId,
+        embedding,
+        limit,
+        contentTypes,
+      );
+      if (results.length > 0) return results;
+    } catch (err) {
+      this.logger.warn(`semantic search failed, fallback to text: ${err}`);
+    }
+
+    const searchTerm = query.toLowerCase();
+    let qb = this.contentRepository
+      .createQueryBuilder('content')
+      .leftJoinAndSelect('content.folders', 'folders')
+      .where('content.userId = :userId', { userId })
+      .andWhere('LOWER(content.title) LIKE :search', {
+        search: `%${searchTerm}%`,
+      })
+      .orderBy('content.createdAt', 'DESC')
+      .limit(limit);
+
+    if (contentTypes && contentTypes.length > 0) {
+      qb = qb.andWhere('content.contentType IN (:...contentTypes)', {
+        contentTypes,
+      });
+    }
+
+    const items = await qb.getMany();
+    return plainToInstance(ContentDto, items, {
+      excludeExtraneousValues: true,
+    });
+  }
+
   async updateEmbedding(id: string, embedding: number[]): Promise<void> {
     const vectorStr = `[${embedding.join(',')}]`;
     await this.dataSource.query(
@@ -311,23 +431,38 @@ export class ContentService {
     userId: string,
     embedding: number[],
     limit: number,
+    contentTypes?: string[],
   ): Promise<ContentDto[]> {
     const vectorStr = `[${embedding.join(',')}]`;
+    const params: unknown[] = [vectorStr, userId, limit];
+    let typeFilter = '';
+    if (contentTypes && contentTypes.length > 0) {
+      params.push(contentTypes);
+      typeFilter = `AND c.content_type = ANY($${params.length})`;
+    }
     const rows = await this.dataSource.query(
-      `SELECT id, title, url, domain, description, type, favicon,
-              site_name AS "siteName",
-              image,
-              content_type AS "contentType",
-              mime_type AS "mimeType",
-              created_at AS "createdAt",
-              updated_at AS "updatedAt",
-              user_id AS "userId"
-       FROM content
-       WHERE user_id = $2 AND embedding IS NOT NULL
-         AND embedding <=> $1::vector < 0.35
-       ORDER BY embedding <=> $1::vector
+      `SELECT c.id, c.title, c.url, c.domain, c.description, c.type, c.favicon,
+              c.site_name AS "siteName",
+              c.image,
+              c.content_type AS "contentType",
+              c.mime_type AS "mimeType",
+              c.created_at AS "createdAt",
+              c.updated_at AS "updatedAt",
+              c.user_id AS "userId",
+              COALESCE(
+                json_agg(json_build_object('id', cf."folderId"))
+                  FILTER (WHERE cf."folderId" IS NOT NULL),
+                '[]'
+              ) AS folders
+       FROM content c
+       LEFT JOIN content_folders cf ON cf."contentId" = c.id
+       WHERE c.user_id = $2 AND c.embedding IS NOT NULL
+         AND c.embedding <=> $1::vector < 0.35
+         ${typeFilter}
+       GROUP BY c.id
+       ORDER BY c.embedding <=> $1::vector
        LIMIT $3`,
-      [vectorStr, userId, limit],
+      params,
     );
     return plainToInstance(ContentDto, rows as object[], {
       excludeExtraneousValues: true,
@@ -393,5 +528,41 @@ export class ContentService {
     }
 
     return content;
+  }
+
+  private async generateAndStoreEmbedding(
+    contentId: string,
+    title: string,
+    description?: string | null,
+  ): Promise<void> {
+    try {
+      const embedding = await this.embeddingService.generateForContent(
+        title,
+        description,
+      );
+      await this.updateEmbedding(contentId, embedding);
+      this.logger.log(`embedding saved for contentId=${contentId}`);
+    } catch (err) {
+      this.logger.warn(`failed to generate embedding for ${contentId}: ${err}`);
+    }
+  }
+
+  private async generateAndStoreImageEmbedding(
+    contentId: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<void> {
+    try {
+      const embedding = await this.embeddingService.generateFromImage(
+        buffer,
+        mimeType,
+      );
+      await this.updateEmbedding(contentId, embedding);
+      this.logger.log(`image embedding saved for contentId=${contentId}`);
+    } catch (err) {
+      this.logger.warn(
+        `failed to generate image embedding for ${contentId}: ${err}`,
+      );
+    }
   }
 }

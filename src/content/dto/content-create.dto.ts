@@ -2,6 +2,7 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
+  IsInt,
   ValidateNested,
   IsArray,
 } from 'class-validator';
@@ -93,8 +94,19 @@ export class ContentCreateDto {
   @IsOptional()
   siteName?: string;
 
+  @IsString()
+  @IsOptional()
   contentType?: string;
+
+  @IsString()
+  @IsOptional()
   fileKey?: string;
+
+  @IsInt()
+  @IsOptional()
   fileSize?: number;
+
+  @IsString()
+  @IsOptional()
   mimeType?: string;
 }

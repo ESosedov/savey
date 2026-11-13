@@ -10,6 +10,7 @@ import { SimilarContent } from './entities/similar-content.entity';
 import { Folder } from '../folders/entities/folder.entity';
 import { StorageModule } from '../storage/store.module';
 import { UsersModule } from '../users/users.module';
+import { EmbeddingModule } from '../embedding/embedding.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UsersModule } from '../users/users.module';
     FoldersModule,
     StorageModule,
     UsersModule,
+    EmbeddingModule,
   ],
   controllers: [ContentController],
   providers: [ContentService, CursorService, SimilarContentService],

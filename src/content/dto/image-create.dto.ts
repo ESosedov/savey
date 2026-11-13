@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ImageData } from '../interfaces/image-data.interface';
 import { IsNumber, IsOptional, IsString, IsUrl } from 'class-validator';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export class ImageCreateDto implements ImageData {
   @ApiProperty({
     description: 'Height of the image',
@@ -15,7 +17,7 @@ export class ImageCreateDto implements ImageData {
     example: 'https://i.ytimg.com/vi/psAxqfx-plc/maxresdefault.jpg',
   })
   @IsString()
-  @IsUrl()
+  @IsUrl({ require_tld: isProduction })
   url: string;
 
   @ApiProperty({
